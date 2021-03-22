@@ -1,19 +1,17 @@
 package processes;
 
-import io.CommandSet;
-
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class ProcessHandler {
-    public static final List<String> DEFAULT_BLACKLIST =
+    public static final List<String> DEFAULT_HIDDEN_PROCESSES =
             Arrays.asList("System32", "Nvidia", "SystemApps", "wallpaper",
                     "Razer", "Native Instruments", "xboxGam", "Microsoft.ZuneVideo", "Settings", "GWSL",
-                    "Keyboard Chattering Fix", "YourPhone", "webhelper", "Driver","Gaomon","Git");
-    public static List<String> currentBlacklist = new ArrayList<>(DEFAULT_BLACKLIST);
+                    "Keyboard Chattering Fix", "YourPhone", "webhelper", "Driver","Gaomon","Git","fsnotifier");
+    public static List<String> hiddenProcesses = new ArrayList<>(DEFAULT_HIDDEN_PROCESSES);
     public static List<Process> reducedProcessList = null;
 
-    public static CommandSet blacklisted = new CommandSet();
+    public static Set<String> blacklisted = new HashSet<>();
 
     //TODO this might not work with lastAllProcess.equals(), because the ordering of ProcessHandle.allProcesses() is
     // unclear
@@ -36,15 +34,15 @@ public class ProcessHandler {
     }
 
     public static List<Process> computeReducedProcessList(String user) {
-        return computeReducedProcessList(user, currentBlacklist, false);
+        return computeReducedProcessList(user, hiddenProcesses, false);
     }
 
     public static List<Process> computeReducedProcessList() {
-        return computeReducedProcessList(System.getProperty("user.name"), currentBlacklist, false);
+        return computeReducedProcessList(System.getProperty("user.name"), hiddenProcesses, false);
     }
 
     public static List<Process> computeReducedProcessList(boolean force) {
-        return computeReducedProcessList(System.getProperty("user.name"), currentBlacklist, force);
+        return computeReducedProcessList(System.getProperty("user.name"), hiddenProcesses, force);
     }
 
     public static List<Process> computeReducedProcessList(List<String> cmdBlacklist) {
@@ -64,4 +62,7 @@ public class ProcessHandler {
         return blacklisted.stream().map(Process::new).collect(Collectors.toList());
     }
 
+    public static void resetHiddenProcesses() {
+        hiddenProcesses=new ArrayList<>(DEFAULT_HIDDEN_PROCESSES);
+    }
 }

@@ -116,7 +116,7 @@ public class GUI {
         //Add all selected processes command representation to the blacklist
         //TODO think about Process::command vs Process::toString here
         removeSelectedFromVisibleList.setOnAction(event -> {
-            ProcessHandler.currentBlacklist.addAll(processesSelectionList.getSelectionModel().getSelectedItems()
+            ProcessHandler.hiddenProcesses.addAll(processesSelectionList.getSelectionModel().getSelectedItems()
                     .stream().map(Process::command).collect(Collectors.toSet()));
             ObservableList<Process> processItems =
                     FXCollections.observableArrayList(ProcessHandler.computeReducedProcessList(true));
@@ -127,10 +127,16 @@ public class GUI {
         removeSelectedFromVisibleList.setTranslateX(0);
         removeSelectedFromVisibleList.setTranslateY(500);
 
+        Button resetHiddenProcesses = new Button("Reset the List of Hidden Processes");
+        resetHiddenProcesses.setOnAction(event -> ProcessHandler.resetHiddenProcesses());
+        resetHiddenProcesses.setTranslateX(0);
+        resetHiddenProcesses.setTranslateY(530);
+
 
         nodes.add(blacklistSelected);
         nodes.add(removeSelectedFromBlacklist);
         nodes.add(removeSelectedFromVisibleList);
+        nodes.add(resetHiddenProcesses);
 
         nodes.add(allowedHeading);
         nodes.add(disallowedHeading);
@@ -187,8 +193,7 @@ public class GUI {
                     mediaView.getMediaPlayer().stop();
                 });
                 t.start();
-//                JOptionPane.showMessageDialog(null,
-//                        "The process " + proc + " is not allowed!!");
+//                JOptionPane.showMessageDialog(null, "The process " + proc + " is not allowed!!");
             }
         });
     }
