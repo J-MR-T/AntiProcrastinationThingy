@@ -17,7 +17,8 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
-import processes.BetterTimer;
+import timers.BetterTimerExecuteOnce;
+import timers.BetterTimerFixedRate;
 import processes.Process;
 import processes.ProcessHandler;
 
@@ -48,18 +49,12 @@ public class GUI {
         //"Visual" wrapper:
         ListView<Process> processesSelectionList = new ListView<>();
         //Actual item list
-        final ObservableList<Process> originalProcessItems =
-                FXCollections.observableArrayList(ProcessHandler.computeReducedProcessList());
+        final ObservableList<Process> originalProcessItems = getProcessItems(false);
         processesSelectionList.setItems(originalProcessItems);
         //This listener refreshes the list every 500ms
-        BetterTimer refreshProcessListAndFindDisallowed = new BetterTimer(() -> {
+        BetterTimerFixedRate refreshProcessListAndFindDisallowed = new BetterTimerFixedRate(() -> {
             //Refresh Process list
-            final List<Process> processList = ProcessHandler.computeReducedProcessList();
-            ObservableList<Process> processItems =
-                    FXCollections.observableArrayList(processList);
-            if (!processesSelectionList.getItems().equals(processItems)) {
-                processesSelectionList.setItems(processItems);
-            }
+            updateProcessItems(processesSelectionList, false);
             //Find Disallowed
             annoyUser(ProcessHandler.getDisallowedProcessesThatAreRunning(), mediaView, volumeSlider);
         }, 500);
@@ -67,7 +62,7 @@ public class GUI {
         processesSelectionList.setTranslateX(0);
         processesSelectionList.setTranslateY(100);
 
-        //List of blacklistes Processes
+        //List of blacklisted Processes
         ListView<Process> blacklisted = new ListView<>();
         final ObservableList<Process> originalBlacklistedItems = getBlacklistedItems();
         blacklisted.setItems(originalBlacklistedItems);
@@ -99,7 +94,6 @@ public class GUI {
             ProcessHandler.reducedProcessList.stream()
                     .filter(proc -> processesSelectionList.getSelectionModel().getSelectedItems().contains(proc))
                     .forEach(proc -> ProcessHandler.blacklisted.add(proc.command()));
-            //TODO maybe do this in the platform.runLater if it throws exceptions?
             blacklisted.setItems(getBlacklistedItems());
         });
 
@@ -114,23 +108,28 @@ public class GUI {
 
         Button removeSelectedFromVisibleList = new Button("Don't Show Selected Anymore");
         //Add all selected processes command representation to the blacklist
-        //TODO think about Process::command vs Process::toString here
+        //We explicitly add the **command** here, because we can be sure only that process is actually excluded
         removeSelectedFromVisibleList.setOnAction(event -> {
-            ProcessHandler.currentBlacklist.addAll(processesSelectionList.getSelectionModel().getSelectedItems()
+            ProcessHandler.hiddenProcesses.addAll(processesSelectionList.getSelectionModel().getSelectedItems()
                     .stream().map(Process::command).collect(Collectors.toSet()));
-            ObservableList<Process> processItems =
-                    FXCollections.observableArrayList(ProcessHandler.computeReducedProcessList(true));
-            if (!processesSelectionList.getItems().equals(processItems)) {
-                processesSelectionList.setItems(processItems);
-            }
+            updateProcessItems(processesSelectionList, true);
         });
         removeSelectedFromVisibleList.setTranslateX(0);
         removeSelectedFromVisibleList.setTranslateY(500);
+
+        Button resetHiddenProcesses = new Button("Reset the List of Hidden Processes");
+        resetHiddenProcesses.setOnAction(event -> {
+            ProcessHandler.resetHiddenProcesses();
+            updateProcessItems(processesSelectionList, true);
+        });
+        resetHiddenProcesses.setTranslateX(0);
+        resetHiddenProcesses.setTranslateY(530);
 
 
         nodes.add(blacklistSelected);
         nodes.add(removeSelectedFromBlacklist);
         nodes.add(removeSelectedFromVisibleList);
+        nodes.add(resetHiddenProcesses);
 
         nodes.add(allowedHeading);
         nodes.add(disallowedHeading);
@@ -150,13 +149,34 @@ public class GUI {
         stage.setScene(mainScene);
         stage.setOnCloseRequest(event -> {
             refreshProcessListAndFindDisallowed.stop();
+            mediaView.getMediaPlayer().stop();
             mediaView.getMediaPlayer().dispose();
             try {
                 GsonHelper.stopApp(volumeSlider.getValue());
             } catch (IOException e) {
                 e.printStackTrace();
             }
+
         });
+    }
+
+    private void updateProcessItems(ListView<Process> processesSelectionList, boolean force) {
+        ObservableList<Process> processItems = getProcessItems(ProcessHandler.blacklisted, force);
+        if (!processesSelectionList.getItems().equals(processItems)) {
+            processesSelectionList.setItems(processItems);
+        }
+    }
+
+    @NotNull
+    private ObservableList<Process> getProcessItems(Set<String> exclude, boolean force) {
+        final List<Process> list = ProcessHandler.computeReducedProcessList(force);
+        list.removeIf(proc -> exclude.contains(proc.toString()) || exclude.contains(proc.command()));
+        return FXCollections.observableArrayList(list);
+    }
+
+    @NotNull
+    private ObservableList<Process> getProcessItems(boolean force) {
+        return FXCollections.observableArrayList(ProcessHandler.computeReducedProcessList(force));
     }
 
     private void setMedia(MediaView mediaView, Slider volumeSlider) {
@@ -179,16 +199,11 @@ public class GUI {
                             || mediaView.getMediaPlayer().statusProperty().get().equals(MediaPlayer.Status.STOPPED))) {
                 Thread t = new Thread(() -> {
                     mediaView.getMediaPlayer().play();
-                    try {
-                        Thread.sleep((long) mediaView.getMediaPlayer().getTotalDuration().toMillis());
-                    } catch (InterruptedException e) {
-                        System.err.println("Interrupted! " + e.getMessage());
-                    }
-                    mediaView.getMediaPlayer().stop();
+                    new BetterTimerExecuteOnce(() -> mediaView.getMediaPlayer().stop(),
+                            (long) mediaView.getMediaPlayer().getTotalDuration().toMillis());
                 });
                 t.start();
-//                JOptionPane.showMessageDialog(null,
-//                        "The process " + proc + " is not allowed!!");
+//                JOptionPane.showMessageDialog(null, "The process " + proc + " is not allowed!!");
             }
         });
     }
