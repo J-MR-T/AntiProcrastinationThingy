@@ -8,7 +8,11 @@ import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.ListView;
 import javafx.scene.control.SelectionMode;
+import javafx.scene.control.Slider;
 import javafx.scene.layout.Pane;
+import javafx.scene.media.Media;
+import javafx.scene.media.MediaPlayer;
+import javafx.scene.media.MediaView;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
@@ -17,8 +21,8 @@ import processes.BetterTimer;
 import processes.Process;
 import processes.ProcessHandler;
 
-import javax.swing.*;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -28,19 +32,17 @@ public class GUI {
 
     public GUI(Stage stage) {
         Pane root = new Pane();
-        Scene scene = new Scene(root, 800, 600);
+        Scene mainScene = new Scene(root, 800, 600);
+        MediaView mediaView = new MediaView();
+        Slider volumeSlider = new Slider(0, 1, 0.1);
+        try {
+            GsonHelper.startApp(volumeSlider);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        setMedia(mediaView, volumeSlider);
         //Retrieving the observable nodes object
         ObservableList<Node> nodes = root.getChildren();
-
-        //Setting the text object as a node
-//        Button hi = new Button("Hi");
-//        nodes.add(hi);
-//        Line line = new Line();
-//        line.setStartX(50);
-//        line.setStartY(100);
-//        line.setEndY(100);
-//        line.setEndX(900);
-//        nodes.add(line);
 
         //List of all Processes
         //"Visual" wrapper:
@@ -59,7 +61,7 @@ public class GUI {
                 processesSelectionList.setItems(processItems);
             }
             //Find Disallowed
-            annoyUser(ProcessHandler.getDisallowedProcessesThatAreRunning());
+            annoyUser(ProcessHandler.getDisallowedProcessesThatAreRunning(), mediaView, volumeSlider);
         }, 500);
         processesSelectionList.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         processesSelectionList.setTranslateX(0);
@@ -73,13 +75,24 @@ public class GUI {
         blacklisted.setTranslateX(500);
         blacklisted.setTranslateY(100);
 
+        //Texts
         //Headings
+        Font arial25 = new Font("arial", 25);
         Text allowedHeading = new Text(75, 20, "Allowed");
-        Font font = new Font("arial", 25);
         Text disallowedHeading = new Text(565, 20, "Not Allowed");
-        allowedHeading.setFont(font);
-        disallowedHeading.setFont(font);
+        allowedHeading.setFont(arial25);
+        disallowedHeading.setFont(arial25);
 
+        Text volume = new Text(275, 275, "Volume");
+        volume.setFont(arial25);
+
+        volumeSlider.setTranslateX(275);
+        volumeSlider.setTranslateY(300);
+        volumeSlider.valueChangingProperty().addListener((obs, wasChanging, isNowChanging) -> {
+            if (!isNowChanging) {
+                mediaView.getMediaPlayer().setVolume(volumeSlider.getValue());
+            }
+        });
 
         Button blacklistSelected = new Button("Blacklist Selected");
         blacklistSelected.setTranslateX(275);
@@ -124,33 +137,60 @@ public class GUI {
         nodes.add(allowedHeading);
         nodes.add(disallowedHeading);
 
+        nodes.add(volume);
+
         nodes.add(processesSelectionList);
         nodes.add(blacklisted);
 
-//        scene.getStylesheets().add("style1/button-styles.css");
+        nodes.add(mediaView);
+        nodes.add(volumeSlider);
+
+//        mainScene.getStylesheets().add("style1/button-styles.css");
 
         stage.setTitle("Anti Procrastination Helper");
 
-        stage.setScene(scene);
+        stage.setScene(mainScene);
         stage.setOnCloseRequest(event -> {
             refreshProcessListAndFindDisallowed.stop();
             try {
-                GsonHelper.stopApp();
+                GsonHelper.stopApp(volumeSlider.getValue());
             } catch (IOException e) {
                 e.printStackTrace();
             }
         });
     }
 
-    private void annoyUser(List<Process> disallowedProcessesThatAreRunning) {
+    private void setMedia(MediaView mediaView, Slider volumeSlider) {
+        setMedia("mixkit-lone-wolf-howling-1729.wav", mediaView, volumeSlider);
+    }
+
+    private void setMedia(String fileName, MediaView mediaView, Slider volumeSlider) {
+        Path musicFile = Path.of("rsc", fileName);
+        Media sound = new Media(musicFile.toUri().toString());
+        MediaPlayer mediaPlayer = new MediaPlayer(sound);
+        mediaPlayer.setVolume(volumeSlider.getValue());
+        mediaView.setMediaPlayer(mediaPlayer);
+    }
+
+    private void annoyUser(List<Process> disallowedProcessesThatAreRunning, MediaView mediaView, Slider volumeSlider) {
         disallowedProcessesThatAreRunning.forEach(proc -> {
-            JOptionPane.showMessageDialog(null,
-                    "The process " + proc + " is not allowed!!");
-//            Path musicFile = Path.of("rsc","annoying.mp3");
-//
-//            Media sound = new Media(musicFile.toFile());
-//            MediaPlayer mediaPlayer = new MediaPlayer(sound);
-//            mediaPlayer.play();
+            if (mediaView.getMediaPlayer().statusProperty().get() != null &&
+                    (mediaView.getMediaPlayer().statusProperty().get().equals(MediaPlayer.Status.READY)
+                            || mediaView.getMediaPlayer().statusProperty().get().equals(MediaPlayer.Status.STALLED)
+                            || mediaView.getMediaPlayer().statusProperty().get().equals(MediaPlayer.Status.STOPPED))) {
+                Thread t = new Thread(() -> {
+                    mediaView.getMediaPlayer().play();
+                    try {
+                        Thread.sleep((long) mediaView.getMediaPlayer().getTotalDuration().toMillis());
+                    } catch (InterruptedException e) {
+                        System.err.println("Interrupted! " + e.getMessage());
+                    }
+                    mediaView.getMediaPlayer().stop();
+                });
+                t.start();
+//                JOptionPane.showMessageDialog(null,
+//                        "The process " + proc + " is not allowed!!");
+            }
         });
     }
 
