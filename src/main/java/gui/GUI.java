@@ -35,6 +35,11 @@ public class GUI {
         Scene mainScene = new Scene(root, 800, 600);
         MediaView mediaView = new MediaView();
         Slider volumeSlider = new Slider(0, 1, 0.1);
+        try {
+            GsonHelper.startApp(volumeSlider);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         setMedia(mediaView, volumeSlider);
         //Retrieving the observable nodes object
         ObservableList<Node> nodes = root.getChildren();
@@ -148,7 +153,7 @@ public class GUI {
         stage.setOnCloseRequest(event -> {
             refreshProcessListAndFindDisallowed.stop();
             try {
-                GsonHelper.stopApp();
+                GsonHelper.stopApp(volumeSlider.getValue());
             } catch (IOException e) {
                 e.printStackTrace();
             }
