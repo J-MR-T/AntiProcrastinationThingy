@@ -88,11 +88,9 @@ public class GUI {
 
         volumeSlider.setTranslateX(275);
         volumeSlider.setTranslateY(300);
-        volumeSlider.valueChangingProperty().addListener((obs, wasChanging, isNowChanging) -> {
-            if (!isNowChanging) {
-                mediaView.getMediaPlayer().setVolume(volumeSlider.getValue());
-            }
-        });
+        volumeSlider.valueChangingProperty().addListener(
+                (obs, wasChanging, isNowChanging) -> mediaView.getMediaPlayer().setVolume(volumeSlider.getValue()));
+        volumeSlider.setOnMouseClicked(event -> mediaView.getMediaPlayer().setVolume(volumeSlider.getValue()));
 
         Button blacklistSelected = new Button("Blacklist Selected");
         blacklistSelected.setTranslateX(275);
@@ -152,6 +150,7 @@ public class GUI {
         stage.setScene(mainScene);
         stage.setOnCloseRequest(event -> {
             refreshProcessListAndFindDisallowed.stop();
+            mediaView.getMediaPlayer().dispose();
             try {
                 GsonHelper.stopApp(volumeSlider.getValue());
             } catch (IOException e) {
@@ -174,7 +173,7 @@ public class GUI {
 
     private void annoyUser(List<Process> disallowedProcessesThatAreRunning, MediaView mediaView, Slider volumeSlider) {
         disallowedProcessesThatAreRunning.forEach(proc -> {
-            if (mediaView.getMediaPlayer().statusProperty().get() != null &&
+            if (mediaView.getMediaPlayer().statusProperty().isNotNull().get() &&
                     (mediaView.getMediaPlayer().statusProperty().get().equals(MediaPlayer.Status.READY)
                             || mediaView.getMediaPlayer().statusProperty().get().equals(MediaPlayer.Status.STALLED)
                             || mediaView.getMediaPlayer().statusProperty().get().equals(MediaPlayer.Status.STOPPED))) {
