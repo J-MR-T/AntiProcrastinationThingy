@@ -1,15 +1,15 @@
-package processes;
+package timers;
 
 import javafx.application.Platform;
 
 import java.util.Timer;
 import java.util.TimerTask;
 
-public class BetterTimer {
+public class BetterTimerExecuteOnce {
     private final Timer timer;
     private final TimerTask task;
 
-    public BetterTimer(final Runnable runner, long period) {
+    public BetterTimerExecuteOnce(final Runnable runner, long delay) {
         timer = new Timer();
         task = new TimerTask() {
             @Override
@@ -17,7 +17,7 @@ public class BetterTimer {
                 Platform.runLater(runner);
             }
         };
-        timer.scheduleAtFixedRate(task, 0, period);
+        timer.schedule(task,delay);
     }
 
     public void stop() {
