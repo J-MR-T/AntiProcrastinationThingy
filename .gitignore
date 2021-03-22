@@ -1,0 +1,9 @@
+/build/*
+/.gradle/buildOutputCleanup/*
+/.gradle/6.7/fileHashes/*
+/.gradle/configuration-cache/*
+/out/*
+*.properties
+*.bin
+*.lock
+*.class
