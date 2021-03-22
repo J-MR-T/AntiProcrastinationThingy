@@ -43,7 +43,15 @@ public class GsonHelper {
     public static void startApp(Slider volumeSlider) throws IOException{
         final CommandSet blacklisted = readBlacklistSet();
         ProcessHandler.blacklisted= blacklisted!=null?blacklisted:new CommandSet();
-        volumeSlider.setValue(Double.parseDouble(Files.readString(defaultVolumePath)));
+        readVolume(volumeSlider);
+    }
+
+    public static void readVolume(Slider volumeSlider) throws IOException {
+        readVolume(volumeSlider,defaultVolumePath);
+    }
+
+    public static void readVolume(Slider volumeSlider,Path path) throws IOException {
+        volumeSlider.setValue(Double.parseDouble(Files.readString(path)));
     }
 
     public static void stopApp(double volume) throws IOException {
