@@ -9,12 +9,13 @@ public class BetterTimerExecuteOnce {
     private final Timer timer;
     private final TimerTask task;
 
-    public BetterTimerExecuteOnce(final Runnable runner, long delay) {
+    public BetterTimerExecuteOnce(Runnable runTask, long delay) {
         timer = new Timer();
         task = new TimerTask() {
             @Override
             public void run() {
-                Platform.runLater(runner);
+                Platform.runLater(runTask);
+                stop();
             }
         };
         timer.schedule(task,delay);
