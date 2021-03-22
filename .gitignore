@@ -3,6 +3,7 @@
 /.gradle/6.7/fileHashes/*
 /.gradle/configuration-cache/*
 /out/*
+rsc/volume.txt
 *.properties
 *.bin
 *.lock
