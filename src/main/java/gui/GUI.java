@@ -13,6 +13,7 @@ import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.scene.paint.Color;
+import javafx.scene.paint.Paint;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
@@ -34,6 +35,7 @@ public class GUI {
     public GUI(Stage stage) {
         Pane root = new Pane();
         Scene mainScene = new Scene(root, 800, 600);
+        mainScene.getStylesheets().add("file:darkmode-style.css");
         MediaView mediaView = new MediaView();
         Slider volumeSlider = new JFXSlider(0, 100, 10);
         try {
@@ -45,8 +47,8 @@ public class GUI {
         //Retrieving the observable nodes object
         ObservableList<Node> nodes = root.getChildren();
 
-        JFXColorPicker primaryColorPicker = new JFXColorPicker(Color.valueOf("#669966"));
-        JFXColorPicker secondaryColorPicker = new JFXColorPicker(Color.valueOf("#FFFFFF"));
+        JFXColorPicker primaryColorPicker = new JFXColorPicker(Color.valueOf("#393e46"));
+        JFXColorPicker secondaryColorPicker = new JFXColorPicker(Color.valueOf("#00adb5"));
         primaryColorPicker.setTranslateX(700);
         primaryColorPicker.setTranslateY(525);
         secondaryColorPicker.setTranslateX(700);
@@ -60,7 +62,7 @@ public class GUI {
         autoKillProcesses.setTranslateX(275);
         autoKillProcesses.setTranslateY(350);
         autoKillProcesses.styleProperty().bindBidirectional(primaryColorPicker.valueProperty(),
-                new ColorStringBijection("jfx-checked-color",Color.BLACK));
+                new ColorStringBijection("jfx-checked-color"));
 
         //List of all Processes
         //"Visual" wrapper:
@@ -106,9 +108,12 @@ public class GUI {
         Text disallowedHeading = new Text(565, 20, "Not Allowed");
         allowedHeading.setFont(arial25);
         disallowedHeading.setFont(arial25);
+        allowedHeading.setFill(Paint.valueOf("00adb5"));
+        disallowedHeading.setFill(Paint.valueOf("00adb5"));
 
         Text volumeHeading = new Text(275, 275, "Volume");
         volumeHeading.setFont(arial25);
+        volumeHeading.setFill(Paint.valueOf("00adb5"));
 
         Text primaryColorHeading = new Text(700, 515, "Primary Color");
         Text secondaryColorHeading = new Text(700, 565, "Secondary Color");
@@ -190,8 +195,6 @@ public class GUI {
 
         nodes.add(mediaView);
         nodes.add(volumeSlider);
-
-//        mainScene.getStylesheets().add("style1/button-styles.css");
 
         stage.setTitle("Anti Procrastination Helper");
         stage.getIcons().add(new Image(Path.of("rsc","shield-alt-solid.png").toUri().toString()));

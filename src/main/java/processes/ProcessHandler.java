@@ -5,7 +5,7 @@ import java.util.stream.Collectors;
 
 public class ProcessHandler {
     public static final List<String> DEFAULT_HIDDEN_PROCESSES =
-            Arrays.asList("System32", "Nvidia", "SystemApps", "wallpaper",
+            List.of("System32", "Nvidia", "SystemApps", "wallpaper",
                     "Razer", "Native Instruments", "xboxGam", "Microsoft.ZuneVideo", "Settings", "GWSL",
                     "Keyboard Chattering Fix", "YourPhone", "webhelper", "Driver", "Gaomon", "Git", "fsnotifier");
     public static List<String> hiddenProcesses = new ArrayList<>(DEFAULT_HIDDEN_PROCESSES);
