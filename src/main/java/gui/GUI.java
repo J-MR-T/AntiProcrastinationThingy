@@ -1,26 +1,26 @@
 package gui;
 
+import com.jfoenix.controls.*;
 import io.GsonHelper;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.Node;
 import javafx.scene.Scene;
-import javafx.scene.control.Button;
-import javafx.scene.control.ListView;
-import javafx.scene.control.SelectionMode;
-import javafx.scene.control.Slider;
+import javafx.scene.control.*;
+import javafx.scene.image.Image;
 import javafx.scene.layout.Pane;
 import javafx.scene.media.Media;
 import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
-import timers.BetterTimerExecuteOnce;
-import timers.BetterTimerFixedRate;
 import processes.Process;
 import processes.ProcessHandler;
+import timers.BetterTimerExecuteOnce;
+import timers.BetterTimerFixedRate;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -35,7 +35,7 @@ public class GUI {
         Pane root = new Pane();
         Scene mainScene = new Scene(root, 800, 600);
         MediaView mediaView = new MediaView();
-        Slider volumeSlider = new Slider(0, 1, 0.1);
+        Slider volumeSlider = new JFXSlider(0, 100, 10);
         try {
             GsonHelper.startApp(volumeSlider);
         } catch (IOException e) {
@@ -45,30 +45,59 @@ public class GUI {
         //Retrieving the observable nodes object
         ObservableList<Node> nodes = root.getChildren();
 
+        JFXColorPicker primaryColorPicker = new JFXColorPicker(Color.valueOf("#669966"));
+        JFXColorPicker secondaryColorPicker = new JFXColorPicker(Color.valueOf("#FFFFFF"));
+        primaryColorPicker.setTranslateX(700);
+        primaryColorPicker.setTranslateY(525);
+        secondaryColorPicker.setTranslateX(700);
+        secondaryColorPicker.setTranslateY(575);
+
+        //Checkboxes
+        CheckBox autoKillProcesses = new JFXCheckBox("""
+                Automatically kill disallowed
+                Processes?
+                WARNING: USE AT YOUR OWN RISK""");
+        autoKillProcesses.setTranslateX(275);
+        autoKillProcesses.setTranslateY(350);
+        autoKillProcesses.styleProperty().bindBidirectional(primaryColorPicker.valueProperty(),
+                new ColorStringBijection("jfx-checked-color",Color.BLACK));
+
         //List of all Processes
         //"Visual" wrapper:
-        ListView<Process> processesSelectionList = new ListView<>();
+        ListView<Process> processesSelectionList = new JFXListView<>();
         //Actual item list
         final ObservableList<Process> originalProcessItems = getProcessItems(false);
         processesSelectionList.setItems(originalProcessItems);
         //This listener refreshes the list every 500ms
-        BetterTimerFixedRate refreshProcessListAndFindDisallowed = new BetterTimerFixedRate(() -> {
-            //Refresh Process list
-            updateProcessItems(processesSelectionList, false);
-            //Find Disallowed
-            annoyUser(ProcessHandler.getDisallowedProcessesThatAreRunning(), mediaView, volumeSlider);
-        }, 500);
+        BetterTimerFixedRate refreshProcessListAndFindDisallowedAndKillDisallowedIfAskedTo =
+                new BetterTimerFixedRate(() -> {
+                    //Refresh Process list
+                    updateProcessItems(processesSelectionList, false);
+                    //Find Disallowed
+                    final List<Process> disallowedProcessesThatAreRunning =
+                            ProcessHandler.getDisallowedProcessesThatAreRunning();
+                    annoyUser(disallowedProcessesThatAreRunning, mediaView);
+                    //Kill if asked to do so
+                    if (autoKillProcesses.isSelected()) {
+                        disallowedProcessesThatAreRunning.forEach(Process::kill);
+                    }
+                }, 500);
         processesSelectionList.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         processesSelectionList.setTranslateX(0);
         processesSelectionList.setTranslateY(100);
+        processesSelectionList.styleProperty().bindBidirectional(primaryColorPicker.valueProperty(),
+                new ColorStringBijection());
 
         //List of blacklisted Processes
-        ListView<Process> blacklisted = new ListView<>();
+        ListView<Process> blacklisted = new JFXListView<>();
         final ObservableList<Process> originalBlacklistedItems = getBlacklistedItems();
         blacklisted.setItems(originalBlacklistedItems);
         blacklisted.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         blacklisted.setTranslateX(500);
         blacklisted.setTranslateY(100);
+        blacklisted.styleProperty().bindBidirectional(primaryColorPicker.valueProperty(),
+                new ColorStringBijection());
+
 
         //Texts
         //Headings
@@ -78,16 +107,22 @@ public class GUI {
         allowedHeading.setFont(arial25);
         disallowedHeading.setFont(arial25);
 
-        Text volume = new Text(275, 275, "Volume");
-        volume.setFont(arial25);
+        Text volumeHeading = new Text(275, 275, "Volume");
+        volumeHeading.setFont(arial25);
+
+        Text primaryColorHeading = new Text(700, 515, "Primary Color");
+        Text secondaryColorHeading = new Text(700, 565, "Secondary Color");
 
         volumeSlider.setTranslateX(275);
         volumeSlider.setTranslateY(300);
         volumeSlider.valueChangingProperty().addListener(
-                (obs, wasChanging, isNowChanging) -> mediaView.getMediaPlayer().setVolume(volumeSlider.getValue()));
-        volumeSlider.setOnMouseClicked(event -> mediaView.getMediaPlayer().setVolume(volumeSlider.getValue()));
+                (obs, wasChanging, isNowChanging) -> mediaView.getMediaPlayer()
+                        .setVolume(volumeSlider.getValue() / 100));
+        volumeSlider.setOnMouseClicked(event -> mediaView.getMediaPlayer().setVolume(volumeSlider.getValue() / 100));
+        volumeSlider.styleProperty().bindBidirectional(primaryColorPicker.valueProperty(),
+                new ColorStringBijection("jfx-default-thumb"));
 
-        Button blacklistSelected = new Button("Blacklist Selected");
+        Button blacklistSelected = new JFXButton("Blacklist Selected");
         blacklistSelected.setTranslateX(275);
         blacklistSelected.setTranslateY(185);
         blacklistSelected.setOnAction(event -> {
@@ -96,8 +131,10 @@ public class GUI {
                     .forEach(proc -> ProcessHandler.blacklisted.add(proc.command()));
             blacklisted.setItems(getBlacklistedItems());
         });
+        blacklistSelected.styleProperty().bindBidirectional(primaryColorPicker.valueProperty(),
+                new ColorStringBijection());
 
-        Button removeSelectedFromBlacklist = new Button("Remove Selected From Blacklist");
+        Button removeSelectedFromBlacklist = new JFXButton("Remove Selected From Blacklist");
         removeSelectedFromBlacklist.setTranslateX(275);
         removeSelectedFromBlacklist.setTranslateY(215);
         removeSelectedFromBlacklist.setOnAction(event -> {
@@ -105,8 +142,10 @@ public class GUI {
                     .forEach(proc -> ProcessHandler.blacklisted.remove(proc.command()));
             blacklisted.setItems(getBlacklistedItems());
         });
+        removeSelectedFromBlacklist.styleProperty().bindBidirectional(primaryColorPicker.valueProperty(),
+                new ColorStringBijection());
 
-        Button removeSelectedFromVisibleList = new Button("Don't Show Selected Anymore");
+        Button removeSelectedFromVisibleList = new JFXButton("Don't Show Selected Anymore");
         //Add all selected processes command representation to the blacklist
         //We explicitly add the **command** here, because we can be sure only that process is actually excluded
         removeSelectedFromVisibleList.setOnAction(event -> {
@@ -116,14 +155,18 @@ public class GUI {
         });
         removeSelectedFromVisibleList.setTranslateX(0);
         removeSelectedFromVisibleList.setTranslateY(500);
+        removeSelectedFromVisibleList.styleProperty().bindBidirectional(primaryColorPicker.valueProperty(),
+                new ColorStringBijection());
 
-        Button resetHiddenProcesses = new Button("Reset the List of Hidden Processes");
+        JFXButton resetHiddenProcesses = new JFXButton("Reset the List of Hidden Processes");
         resetHiddenProcesses.setOnAction(event -> {
             ProcessHandler.resetHiddenProcesses();
             updateProcessItems(processesSelectionList, true);
         });
         resetHiddenProcesses.setTranslateX(0);
         resetHiddenProcesses.setTranslateY(530);
+        resetHiddenProcesses.styleProperty().bindBidirectional(primaryColorPicker.valueProperty(),
+                new ColorStringBijection());
 
 
         nodes.add(blacklistSelected);
@@ -133,8 +176,14 @@ public class GUI {
 
         nodes.add(allowedHeading);
         nodes.add(disallowedHeading);
+        nodes.add(volumeHeading);
+        nodes.add(primaryColorHeading);
+        nodes.add(secondaryColorHeading);
 
-        nodes.add(volume);
+        nodes.add(autoKillProcesses);
+
+        nodes.add(primaryColorPicker);
+        nodes.add(secondaryColorPicker);
 
         nodes.add(processesSelectionList);
         nodes.add(blacklisted);
@@ -145,14 +194,15 @@ public class GUI {
 //        mainScene.getStylesheets().add("style1/button-styles.css");
 
         stage.setTitle("Anti Procrastination Helper");
+        stage.getIcons().add(new Image(Path.of("rsc","shield-alt-solid.png").toUri().toString()));
 
         stage.setScene(mainScene);
         stage.setOnCloseRequest(event -> {
-            refreshProcessListAndFindDisallowed.stop();
+            refreshProcessListAndFindDisallowedAndKillDisallowedIfAskedTo.stop();
             mediaView.getMediaPlayer().stop();
             mediaView.getMediaPlayer().dispose();
             try {
-                GsonHelper.stopApp(volumeSlider.getValue());
+                GsonHelper.stopApp(volumeSlider.getValue() / 100);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -187,11 +237,11 @@ public class GUI {
         Path musicFile = Path.of("rsc", fileName);
         Media sound = new Media(musicFile.toUri().toString());
         MediaPlayer mediaPlayer = new MediaPlayer(sound);
-        mediaPlayer.setVolume(volumeSlider.getValue());
+        mediaPlayer.setVolume(volumeSlider.getValue() / 100);
         mediaView.setMediaPlayer(mediaPlayer);
     }
 
-    private void annoyUser(List<Process> disallowedProcessesThatAreRunning, MediaView mediaView, Slider volumeSlider) {
+    private void annoyUser(List<Process> disallowedProcessesThatAreRunning, MediaView mediaView) {
         disallowedProcessesThatAreRunning.forEach(proc -> {
             if (mediaView.getMediaPlayer().statusProperty().isNotNull().get() &&
                     (mediaView.getMediaPlayer().statusProperty().get().equals(MediaPlayer.Status.READY)

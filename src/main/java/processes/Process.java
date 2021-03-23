@@ -136,6 +136,10 @@ public class Process {
         return handle.info().user().orElse("");
     }
 
+    public boolean kill(){
+        return handle.destroy();
+    }
+
     private String determineStringRepresentation() {
         String[] pathParts = command().split(Pattern.quote("\\"));
         if (pathParts.length == 0) return "";

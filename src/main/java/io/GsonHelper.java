@@ -38,7 +38,7 @@ public class GsonHelper {
     }
 
     public static void writeVolume(double volume, Path path) throws IOException {
-        Files.writeString(path, String.valueOf(volume));
+        Files.writeString(path, String.valueOf(volume*100));
     }
 
     public static void writeVolume(double volume) throws IOException {
