@@ -1,11 +1,14 @@
 package gui;
 
+import com.dustinredmond.fxtrayicon.FXTrayIcon;
 import com.jfoenix.controls.*;
 import io.GsonHelper;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.Node;
 import javafx.scene.Scene;
+import javafx.scene.control.Button;
 import javafx.scene.control.*;
 import javafx.scene.image.Image;
 import javafx.scene.layout.Pane;
@@ -23,11 +26,15 @@ import processes.ProcessHandler;
 import timers.BetterTimerExecuteOnce;
 import timers.BetterTimerFixedRate;
 
+import java.awt.*;
 import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 public class GUI {
@@ -46,6 +53,16 @@ public class GUI {
         setMedia(mediaView, volumeSlider);
         //Retrieving the observable nodes object
         ObservableList<Node> nodes = root.getChildren();
+        final Image icon = new Image(Path.of("rsc", "shield-alt-solid.png").toUri().toString());
+
+        FXTrayIcon trayIcon = null;
+        try {
+            if (SystemTray.isSupported()) {
+                trayIcon = new FXTrayIcon(stage, Path.of("rsc", "shield-alt-solid.png").toUri().toURL());
+            }
+        } catch (MalformedURLException e) {
+            e.printStackTrace();
+        }
 
         JFXColorPicker primaryColorPicker = new JFXColorPicker(Color.valueOf("#393e46"));
         JFXColorPicker secondaryColorPicker = new JFXColorPicker(Color.valueOf("#00adb5"));
@@ -159,25 +176,42 @@ public class GUI {
             updateProcessItems(processesSelectionList, true);
         });
         removeSelectedFromVisibleList.setTranslateX(0);
-        removeSelectedFromVisibleList.setTranslateY(500);
+        removeSelectedFromVisibleList.setTranslateY(505);
         removeSelectedFromVisibleList.styleProperty().bindBidirectional(primaryColorPicker.valueProperty(),
                 new ColorStringBijection());
 
-        JFXButton resetHiddenProcesses = new JFXButton("Reset the List of Hidden Processes");
+        Button resetHiddenProcesses = new JFXButton("Reset the List of Hidden Processes");
         resetHiddenProcesses.setOnAction(event -> {
             ProcessHandler.resetHiddenProcesses();
             updateProcessItems(processesSelectionList, true);
         });
         resetHiddenProcesses.setTranslateX(0);
-        resetHiddenProcesses.setTranslateY(530);
+        resetHiddenProcesses.setTranslateY(535);
         resetHiddenProcesses.styleProperty().bindBidirectional(primaryColorPicker.valueProperty(),
                 new ColorStringBijection());
 
+        ToggleButton toggleCloseToTray = new JFXToggleButton();
+        toggleCloseToTray.setTranslateX(275);
+        toggleCloseToTray.setTranslateY(500);
+        toggleCloseToTray.setText("Enable close to tray");
+        final FXTrayIcon finalTrayIcon = trayIcon;
+        if (finalTrayIcon != null) {
+            toggleCloseToTray.setOnAction(event -> {
+                if(finalTrayIcon.isShowing()){
+                    finalTrayIcon.hide();
+                    finalTrayIcon.clear();
+                }else{
+                    finalTrayIcon.show();
+                }
+            });
+        }
 
         nodes.add(blacklistSelected);
         nodes.add(removeSelectedFromBlacklist);
         nodes.add(removeSelectedFromVisibleList);
         nodes.add(resetHiddenProcesses);
+
+        nodes.add(toggleCloseToTray);
 
         nodes.add(allowedHeading);
         nodes.add(disallowedHeading);
@@ -197,7 +231,7 @@ public class GUI {
         nodes.add(volumeSlider);
 
         stage.setTitle("Anti Procrastination Helper");
-        stage.getIcons().add(new Image(Path.of("rsc","shield-alt-solid.png").toUri().toString()));
+        stage.getIcons().add(icon);
 
         stage.setScene(mainScene);
         stage.setOnCloseRequest(event -> {

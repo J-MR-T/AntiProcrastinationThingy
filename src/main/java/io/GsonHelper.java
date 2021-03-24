@@ -16,9 +16,9 @@ import java.util.List;
 import java.util.Set;
 
 public class GsonHelper {
-    private static final Path defaultBlacklistSetPath = Path.of("rsc", "blacklisted.json");
-    private static final Path defaultVolumePath = Path.of("rsc", "volume.txt");
-    private static final Path defaultHiddenProcessesPath = Path.of("rsc", "hidden.json");
+    private static final Path DEFAULT_BLACKLIST_SET_PATH = Path.of("rsc", "blacklisted.json");
+    private static final Path DEFAULT_VOLUME_PATH = Path.of("rsc", "volume.txt");
+    private static final Path DEFAULT_HIDDEN_PROCESSES_PATH = Path.of("rsc", "hidden.json");
     private static final Gson gson = new Gson();
 
     public static Set<String> readBlacklistSet(Path path) throws FileNotFoundException {
@@ -26,7 +26,7 @@ public class GsonHelper {
     }
 
     public static Set<String> readBlacklistSet() throws FileNotFoundException {
-        return readBlacklistSet(defaultBlacklistSetPath);
+        return readBlacklistSet(DEFAULT_BLACKLIST_SET_PATH);
     }
 
     public static void writeBlacklistSet(Set<String> set, Path path) throws IOException {
@@ -34,7 +34,7 @@ public class GsonHelper {
     }
 
     public static void writeBlacklistSet(Set<String> set) throws IOException {
-        writeBlacklistSet(set, defaultBlacklistSetPath);
+        writeBlacklistSet(set, DEFAULT_BLACKLIST_SET_PATH);
     }
 
     public static void writeVolume(double volume, Path path) throws IOException {
@@ -42,7 +42,7 @@ public class GsonHelper {
     }
 
     public static void writeVolume(double volume) throws IOException {
-        writeVolume(volume, defaultVolumePath);
+        writeVolume(volume, DEFAULT_VOLUME_PATH);
     }
 
     public static void writeHiddenProcesses(List<String> hiddenProcesses, Path path) throws IOException {
@@ -50,11 +50,11 @@ public class GsonHelper {
     }
 
     public static void writeHiddenProcesses(List<String> hiddenProcesses) throws IOException {
-        writeHiddenProcesses(hiddenProcesses, defaultHiddenProcessesPath);
+        writeHiddenProcesses(hiddenProcesses, DEFAULT_HIDDEN_PROCESSES_PATH);
     }
 
     public static List<String> readHiddenProcesses() throws IOException {
-        return readHiddenProcesses(defaultHiddenProcessesPath);
+        return readHiddenProcesses(DEFAULT_HIDDEN_PROCESSES_PATH);
     }
 
     public static List<String> readHiddenProcesses(Path path) throws IOException {
@@ -62,7 +62,7 @@ public class GsonHelper {
     }
 
     public static void readVolume(Slider volumeSlider) throws IOException {
-        readVolume(volumeSlider, defaultVolumePath);
+        readVolume(volumeSlider, DEFAULT_VOLUME_PATH);
     }
 
     public static void readVolume(Slider volumeSlider, Path path) throws IOException {
