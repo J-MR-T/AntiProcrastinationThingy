@@ -21,6 +21,7 @@ import javafx.scene.text.Font;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import processes.Process;
 import processes.ProcessHandler;
 import timers.BetterTimerExecuteOnce;
@@ -55,13 +56,18 @@ public class GUI {
         ObservableList<Node> nodes = root.getChildren();
         final Image icon = new Image(Path.of("rsc", "shield-alt-solid.png").toUri().toString());
 
-        FXTrayIcon trayIcon = null;
+        final FXTrayIcon trayIcon;
+        URL url = null;
         try {
-            if (SystemTray.isSupported()) {
-                trayIcon = new FXTrayIcon(stage, Path.of("rsc", "shield-alt-solid.png").toUri().toURL());
-            }
+            url = Path.of("rsc", "shield-alt-solid.png").toUri().toURL();
         } catch (MalformedURLException e) {
             e.printStackTrace();
+
+        }
+        if (FXTrayIcon.isSupported() && url != null) {
+            trayIcon = new FXTrayIcon(stage, url);
+        } else {
+            trayIcon = null;
         }
 
         JFXColorPicker primaryColorPicker = new JFXColorPicker(Color.valueOf("#393e46"));
@@ -71,15 +77,32 @@ public class GUI {
         secondaryColorPicker.setTranslateX(700);
         secondaryColorPicker.setTranslateY(575);
 
-        //Checkboxes
-        CheckBox autoKillProcesses = new JFXCheckBox("""
-                Automatically kill disallowed
-                Processes?
-                WARNING: USE AT YOUR OWN RISK""");
+        //Toggle Buttons
+        ToggleButton autoKillProcesses = new JFXToggleButton();
+        autoKillProcesses.setText("""
+                Automatically kill
+                disallowed Processes?
+                WARNING: USE AT
+                YOUR OWN RISK""");
         autoKillProcesses.setTranslateX(275);
         autoKillProcesses.setTranslateY(350);
         autoKillProcesses.styleProperty().bindBidirectional(primaryColorPicker.valueProperty(),
                 new ColorStringBijection("jfx-checked-color"));
+
+        ToggleButton toggleCloseToTray = new JFXToggleButton();
+        toggleCloseToTray.setTranslateX(275);
+        toggleCloseToTray.setTranslateY(500);
+        toggleCloseToTray.setText("Enable close to tray");
+        if (trayIcon != null) {
+            toggleCloseToTray.setOnAction(event -> {
+                if (trayIcon.isShowing()) {
+                    trayIcon.hide();
+                    trayIcon.clear();
+                } else {
+                    trayIcon.show();
+                }
+            });
+        }
 
         //List of all Processes
         //"Visual" wrapper:
@@ -88,6 +111,7 @@ public class GUI {
         final ObservableList<Process> originalProcessItems = getProcessItems(false);
         processesSelectionList.setItems(originalProcessItems);
         //This listener refreshes the list every 500ms
+        FXTrayIcon finalTrayIcon1 = trayIcon;
         BetterTimerFixedRate refreshProcessListAndFindDisallowedAndKillDisallowedIfAskedTo =
                 new BetterTimerFixedRate(() -> {
                     //Refresh Process list
@@ -95,7 +119,7 @@ public class GUI {
                     //Find Disallowed
                     final List<Process> disallowedProcessesThatAreRunning =
                             ProcessHandler.getDisallowedProcessesThatAreRunning();
-                    annoyUser(disallowedProcessesThatAreRunning, mediaView);
+                    annoyUser(disallowedProcessesThatAreRunning, mediaView, finalTrayIcon1);
                     //Kill if asked to do so
                     if (autoKillProcesses.isSelected()) {
                         disallowedProcessesThatAreRunning.forEach(Process::kill);
@@ -190,21 +214,6 @@ public class GUI {
         resetHiddenProcesses.styleProperty().bindBidirectional(primaryColorPicker.valueProperty(),
                 new ColorStringBijection());
 
-        ToggleButton toggleCloseToTray = new JFXToggleButton();
-        toggleCloseToTray.setTranslateX(275);
-        toggleCloseToTray.setTranslateY(500);
-        toggleCloseToTray.setText("Enable close to tray");
-        final FXTrayIcon finalTrayIcon = trayIcon;
-        if (finalTrayIcon != null) {
-            toggleCloseToTray.setOnAction(event -> {
-                if(finalTrayIcon.isShowing()){
-                    finalTrayIcon.hide();
-                    finalTrayIcon.clear();
-                }else{
-                    finalTrayIcon.show();
-                }
-            });
-        }
 
         nodes.add(blacklistSelected);
         nodes.add(removeSelectedFromBlacklist);
@@ -234,6 +243,7 @@ public class GUI {
         stage.getIcons().add(icon);
 
         stage.setScene(mainScene);
+        FXTrayIcon finalTrayIcon2 = trayIcon;
         stage.setOnCloseRequest(event -> {
             refreshProcessListAndFindDisallowedAndKillDisallowedIfAskedTo.stop();
             mediaView.getMediaPlayer().stop();
@@ -243,10 +253,18 @@ public class GUI {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-
+            finalTrayIcon2.clear();
+            finalTrayIcon2.hide();
         });
     }
 
+    /**
+     * Update the parameter processesSelectionList's content using the getProcessItems method
+     *
+     * @param processesSelectionList
+     * @param force
+     * @see gui.GUI
+     */
     private void updateProcessItems(ListView<Process> processesSelectionList, boolean force) {
         ObservableList<Process> processItems = getProcessItems(ProcessHandler.blacklisted, force);
         if (!processesSelectionList.getItems().equals(processItems)) {
@@ -266,10 +284,23 @@ public class GUI {
         return FXCollections.observableArrayList(ProcessHandler.computeReducedProcessList(force));
     }
 
+    /**
+     * Default sound to be played to <b>annoyUser</b>
+     *
+     * @param mediaView    the mediaView which has the appropriate mediaPlayer to be affected
+     * @param volumeSlider guess what
+     */
     private void setMedia(MediaView mediaView, Slider volumeSlider) {
         setMedia("mixkit-lone-wolf-howling-1729.wav", mediaView, volumeSlider);
     }
 
+    /**
+     * Set sound to be played to <b>annoyUser</b>
+     *
+     * @param fileName     guess what
+     * @param mediaView    the mediaView which has the appropriate mediaPlayer to be affected
+     * @param volumeSlider guess what
+     */
     private void setMedia(String fileName, MediaView mediaView, Slider volumeSlider) {
         Path musicFile = Path.of("rsc", fileName);
         Media sound = new Media(musicFile.toUri().toString());
@@ -278,18 +309,44 @@ public class GUI {
         mediaView.setMediaPlayer(mediaPlayer);
     }
 
+    /**
+     * hehe
+     *
+     * @param disallowedProcessesThatAreRunning list of processes to annoy the User about
+     * @param mediaView                         the media view to play the annoying sound
+     */
     private void annoyUser(List<Process> disallowedProcessesThatAreRunning, MediaView mediaView) {
+        annoyUser(disallowedProcessesThatAreRunning, mediaView, null);
+    }
+
+    /**
+     * hehe
+     *
+     * @param disallowedProcessesThatAreRunning list of processes to annoy the User about
+     * @param mediaView                         the media view to play the annoying sound
+     * @param trayIcon                          the tray Icon for messaging
+     */
+    private void annoyUser(List<Process> disallowedProcessesThatAreRunning, MediaView mediaView,
+            @Nullable FXTrayIcon trayIcon) {
         disallowedProcessesThatAreRunning.forEach(proc -> {
             if (mediaView.getMediaPlayer().statusProperty().isNotNull().get() &&
                     (mediaView.getMediaPlayer().statusProperty().get().equals(MediaPlayer.Status.READY)
                             || mediaView.getMediaPlayer().statusProperty().get().equals(MediaPlayer.Status.STALLED)
                             || mediaView.getMediaPlayer().statusProperty().get().equals(MediaPlayer.Status.STOPPED))) {
-                Thread t = new Thread(() -> {
-                    mediaView.getMediaPlayer().play();
-                    new BetterTimerExecuteOnce(() -> mediaView.getMediaPlayer().stop(),
-                            (long) mediaView.getMediaPlayer().getTotalDuration().toMillis());
-                });
-                t.start();
+                if (trayIcon != null) {
+                    boolean wasShowing = trayIcon.isShowing();
+                    if (!wasShowing) {
+                        trayIcon.show();
+                    }
+                    trayIcon.showErrorMessage(proc.toString(), "Der Prozess " + proc + " ist nicht erlaubt!");
+                    if (!wasShowing) {
+                        trayIcon.hide();
+                        trayIcon.clear();
+                    }
+                }
+                new BetterTimerExecuteOnce(() -> mediaView.getMediaPlayer().play());
+                new BetterTimerExecuteOnce(() -> mediaView.getMediaPlayer().stop(),
+                        (long) mediaView.getMediaPlayer().getTotalDuration().toMillis());
 //                JOptionPane.showMessageDialog(null, "The process " + proc + " is not allowed!!");
             }
         });

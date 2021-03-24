@@ -21,6 +21,10 @@ public class BetterTimerExecuteOnce {
         timer.schedule(task,delay);
     }
 
+    public BetterTimerExecuteOnce(Runnable runTask) {
+        this(runTask,0L);
+    }
+
     public void stop() {
         timer.cancel();
     }
