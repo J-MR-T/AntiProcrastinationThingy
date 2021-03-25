@@ -3,7 +3,6 @@ package gui;
 import com.dustinredmond.fxtrayicon.FXTrayIcon;
 import com.jfoenix.controls.*;
 import io.GsonHelper;
-import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.Node;
@@ -24,26 +23,27 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import processes.Process;
 import processes.ProcessHandler;
+import timers.BetterTimer;
 import timers.BetterTimerExecuteOnce;
 import timers.BetterTimerFixedRate;
 
-import java.awt.*;
+import javax.swing.*;
+import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Path;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class GUI {
+    public static ActionListener TRAY_EXIT_LISTENER = null;
 
     public GUI(Stage stage) {
         Pane root = new Pane();
         Scene mainScene = new Scene(root, 800, 600);
         mainScene.getStylesheets().add("file:darkmode-style.css");
+        List<BetterTimer> timers = new ArrayList<>();
         MediaView mediaView = new MediaView();
         Slider volumeSlider = new JFXSlider(0, 100, 10);
         try {
@@ -69,6 +69,9 @@ public class GUI {
         } else {
             trayIcon = null;
         }
+        TRAY_EXIT_LISTENER = event -> {
+            exitAppUnconditional(volumeSlider, mediaView, timers, trayIcon);
+        };
 
         JFXColorPicker primaryColorPicker = new JFXColorPicker(Color.valueOf("#393e46"));
         JFXColorPicker secondaryColorPicker = new JFXColorPicker(Color.valueOf("#00adb5"));
@@ -96,10 +99,9 @@ public class GUI {
         if (trayIcon != null) {
             toggleCloseToTray.setOnAction(event -> {
                 if (trayIcon.isShowing()) {
-                    trayIcon.hide();
-                    trayIcon.clear();
+                    disableTrayIcon(trayIcon);
                 } else {
-                    trayIcon.show();
+                    enableTrayIcon(trayIcon);
                 }
             });
         }
@@ -111,7 +113,6 @@ public class GUI {
         final ObservableList<Process> originalProcessItems = getProcessItems(false);
         processesSelectionList.setItems(originalProcessItems);
         //This listener refreshes the list every 500ms
-        FXTrayIcon finalTrayIcon1 = trayIcon;
         BetterTimerFixedRate refreshProcessListAndFindDisallowedAndKillDisallowedIfAskedTo =
                 new BetterTimerFixedRate(() -> {
                     //Refresh Process list
@@ -119,12 +120,13 @@ public class GUI {
                     //Find Disallowed
                     final List<Process> disallowedProcessesThatAreRunning =
                             ProcessHandler.getDisallowedProcessesThatAreRunning();
-                    annoyUser(disallowedProcessesThatAreRunning, mediaView, finalTrayIcon1);
+                    annoyUser(disallowedProcessesThatAreRunning, mediaView, trayIcon);
                     //Kill if asked to do so
                     if (autoKillProcesses.isSelected()) {
                         disallowedProcessesThatAreRunning.forEach(Process::kill);
                     }
                 }, 500);
+        timers.add(refreshProcessListAndFindDisallowedAndKillDisallowedIfAskedTo);
         processesSelectionList.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         processesSelectionList.setTranslateX(0);
         processesSelectionList.setTranslateY(100);
@@ -243,9 +245,70 @@ public class GUI {
         stage.getIcons().add(icon);
 
         stage.setScene(mainScene);
-        FXTrayIcon finalTrayIcon2 = trayIcon;
+
+
+        //This is called even if the tray Icon exists so we have to check for that separately
         stage.setOnCloseRequest(event -> {
-            refreshProcessListAndFindDisallowedAndKillDisallowedIfAskedTo.stop();
+            exitAppConditional(volumeSlider, mediaView,
+                    List.of(refreshProcessListAndFindDisallowedAndKillDisallowedIfAskedTo),
+                    trayIcon);
+        });
+    }
+
+    /**
+     * Replaces the ActionListener of the specified trayIcon with TRAY_EXIT_LISTENER
+     *
+     * @param trayIcon the tray icon in question
+     */
+    private void replaceTrayIconActionListener(FXTrayIcon trayIcon) {
+        try {
+            final java.awt.MenuItem originalExitItem = trayIcon.getMenuItem(1);
+            Arrays.stream(originalExitItem.getActionListeners()).forEach(originalExitItem::removeActionListener);
+            originalExitItem.addActionListener(TRAY_EXIT_LISTENER);
+        } catch (ArrayIndexOutOfBoundsException e) {
+            System.err.println("Couldn't replace tray icon action listener");
+        }
+    }
+
+    /**
+     * Exit the app if the trayIcon allows it or if its forced.
+     *
+     * @param volumeSlider The volume slider which contains the value to be saved
+     * @param mediaView    the media view which contains the primary media player
+     * @param timers       all running timers that should be stopped
+     * @param trayIcon     The tray icon which should be disabled to close the application
+     */
+    private void exitAppUnconditional(Slider volumeSlider, MediaView mediaView, List<BetterTimer> timers,
+            FXTrayIcon trayIcon) {
+        exitAppConditional(volumeSlider, mediaView, timers, trayIcon, true);
+    }
+
+    /**
+     * Exit the app if the trayIcon allows it or if its forced.
+     *
+     * @param volumeSlider The volume slider which contains the value to be saved
+     * @param mediaView    the media view which contains the primary media player
+     * @param timers       all running timers that should be stopped
+     * @param trayIcon     the tray icon which decides if the app should be exited and should be disabled to close the application
+     */
+    private void exitAppConditional(Slider volumeSlider, MediaView mediaView, List<BetterTimer> timers,
+            FXTrayIcon trayIcon) {
+        exitAppConditional(volumeSlider, mediaView, timers, trayIcon, false);
+    }
+
+    /**
+     * Exit the app if the trayIcon allows it or if its forced.
+     *
+     * @param force        Ignore the condition of the tray Icon and exit in any case
+     * @param volumeSlider The volume slider which contains the value to be saved
+     * @param mediaView    the media view which contains the primary media player
+     * @param timers       all running timers that should be stopped
+     * @param trayIcon     the tray icon which decides if the app should be exited and should be disabled to close the application
+     */
+    private void exitAppConditional(Slider volumeSlider, MediaView mediaView, List<BetterTimer> timers,
+            FXTrayIcon trayIcon, boolean force) {
+        if (force || trayIcon == null || !trayIcon.isShowing()) {
+            timers.forEach(BetterTimer::stop);
             mediaView.getMediaPlayer().stop();
             mediaView.getMediaPlayer().dispose();
             try {
@@ -253,16 +316,30 @@ public class GUI {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            finalTrayIcon2.clear();
-            finalTrayIcon2.hide();
+            if (trayIcon != null) {
+                trayIcon.clear();
+                trayIcon.hide();
+            }
+        }
+    }
+
+    private void enableTrayIcon(FXTrayIcon trayIcon) {
+        trayIcon.show();
+        SwingUtilities.invokeLater(() -> {
+            replaceTrayIconActionListener(trayIcon);
         });
+    }
+
+    private void disableTrayIcon(FXTrayIcon trayIcon) {
+        trayIcon.clear();
+        trayIcon.hide();
     }
 
     /**
      * Update the parameter processesSelectionList's content using the getProcessItems method
      *
      * @param processesSelectionList
-     * @param force
+     * @param force                  Force the update. Use this to update the list after the hiddenList has been updated
      * @see gui.GUI
      */
     private void updateProcessItems(ListView<Process> processesSelectionList, boolean force) {
@@ -336,7 +413,7 @@ public class GUI {
                 if (trayIcon != null) {
                     boolean wasShowing = trayIcon.isShowing();
                     if (!wasShowing) {
-                        trayIcon.show();
+                        enableTrayIcon(trayIcon);
                     }
                     trayIcon.showErrorMessage(proc.toString(), "Der Prozess " + proc + " ist nicht erlaubt!");
                     if (!wasShowing) {

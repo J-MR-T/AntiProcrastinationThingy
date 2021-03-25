@@ -5,31 +5,19 @@ import javafx.application.Platform;
 import java.util.Timer;
 import java.util.TimerTask;
 
-public class BetterTimerExecuteOnce {
-    private final Timer timer;
-    private final TimerTask task;
+public class BetterTimerExecuteOnce extends BetterTimer {
 
     public BetterTimerExecuteOnce(Runnable runTask, long delay) {
-        timer = new Timer();
-        task = new TimerTask() {
+        super(new Timer(), new TimerTask() {
             @Override
             public void run() {
                 Platform.runLater(runTask);
-                stop();
             }
-        };
-        timer.schedule(task,delay);
+        },true);
+        timer.schedule(task, delay);
     }
 
     public BetterTimerExecuteOnce(Runnable runTask) {
-        this(runTask,0L);
-    }
-
-    public void stop() {
-        timer.cancel();
-    }
-
-    public void fire() {
-        task.run();
+        this(runTask, 0L);
     }
 }
