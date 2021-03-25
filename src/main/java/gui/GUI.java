@@ -3,6 +3,7 @@ package gui;
 import com.dustinredmond.fxtrayicon.FXTrayIcon;
 import com.jfoenix.controls.*;
 import io.GsonHelper;
+import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.scene.Node;
@@ -99,9 +100,13 @@ public class GUI {
         if (trayIcon != null) {
             toggleCloseToTray.setOnAction(event -> {
                 if (trayIcon.isShowing()) {
-                    disableTrayIcon(trayIcon);
+                    toggleCloseToTray.setDisable(true);
+                    Platform.runLater(() -> disableTrayIcon(trayIcon));
+                    new BetterTimerExecuteOnce(() -> toggleCloseToTray.setDisable(false), 200L);
                 } else {
-                    enableTrayIcon(trayIcon);
+                    toggleCloseToTray.setDisable(true);
+                    Platform.runLater(() -> enableTrayIcon(trayIcon));
+                    new BetterTimerExecuteOnce(() -> toggleCloseToTray.setDisable(false), 200L);
                 }
             });
         }
@@ -309,7 +314,11 @@ public class GUI {
             FXTrayIcon trayIcon, boolean force) {
         if (force || trayIcon == null || !trayIcon.isShowing()) {
             timers.forEach(BetterTimer::stop);
-            mediaView.getMediaPlayer().stop();
+            try{
+                mediaView.getMediaPlayer().stop();
+            }catch (NullPointerException wtfWhyIsThisExceptionEvenThrown){
+
+            }
             mediaView.getMediaPlayer().dispose();
             try {
                 GsonHelper.stopApp(volumeSlider.getValue() / 100);
@@ -320,19 +329,20 @@ public class GUI {
                 trayIcon.clear();
                 trayIcon.hide();
             }
+            Platform.exit();
         }
     }
 
     private void enableTrayIcon(FXTrayIcon trayIcon) {
         trayIcon.show();
-        SwingUtilities.invokeLater(() -> {
-            replaceTrayIconActionListener(trayIcon);
-        });
+        SwingUtilities.invokeLater(() -> replaceTrayIconActionListener(trayIcon));
     }
 
     private void disableTrayIcon(FXTrayIcon trayIcon) {
-        trayIcon.clear();
-        trayIcon.hide();
+        SwingUtilities.invokeLater(() -> {
+            trayIcon.clear();
+            trayIcon.hide();
+        });
     }
 
     /**
@@ -424,7 +434,6 @@ public class GUI {
                 new BetterTimerExecuteOnce(() -> mediaView.getMediaPlayer().play());
                 new BetterTimerExecuteOnce(() -> mediaView.getMediaPlayer().stop(),
                         (long) mediaView.getMediaPlayer().getTotalDuration().toMillis());
-//                JOptionPane.showMessageDialog(null, "The process " + proc + " is not allowed!!");
             }
         });
     }
