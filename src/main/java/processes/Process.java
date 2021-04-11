@@ -22,7 +22,7 @@ public class Process {
      *
      * @param command The System command which started the process
      */
-    Process(String command) {
+    public Process(String command) {
         this(new ProcessHandle() {
             @Override
             public long pid() {
