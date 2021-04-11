@@ -1,13 +1,17 @@
 package io;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.InstanceCreator;
 import javafx.scene.control.Slider;
+import processes.Process;
 import processes.ProcessHandler;
 
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -38,7 +42,7 @@ public class PersistenceHelper {
     }
 
     public static void writeVolume(double volume, Path path) throws IOException {
-        Files.writeString(path, String.valueOf(volume*100));
+        Files.writeString(path, String.valueOf(volume * 100));
     }
 
     public static void writeVolume(double volume) throws IOException {
@@ -75,13 +79,33 @@ public class PersistenceHelper {
         final List<String> hiddenProcesses = readHiddenProcesses();
         ProcessHandler.hiddenProcesses =
                 hiddenProcesses != null ? hiddenProcesses : new ArrayList<>(ProcessHandler.DEFAULT_HIDDEN_PROCESSES);
-        readVolume(volumeSlider);
+        if (volumeSlider != null) {
+            readVolume(volumeSlider);
+        }
         ProcessHandler.computeReducedProcessList(true);
     }
 
-    public static void stopApp(double volume) throws IOException {
+    public static void stopApp(Double volume) throws IOException {
         writeBlacklistSet(ProcessHandler.blacklisted);
-        writeVolume(volume);
+        if (volume != null) {
+            writeVolume(volume);
+        }
         writeHiddenProcesses(ProcessHandler.hiddenProcesses);
+    }
+
+    public static void startApp() throws IOException {
+        startApp(null);
+    }
+
+    public static void stopApp() throws IOException {
+        stopApp(null);
+    }
+
+    public static <T> void saveObjectToFile(T object, Path path) throws IOException {
+        Files.writeString(path, gson.toJson(object));
+    }
+
+    public static <T> T readObjectFromFile(Class<T> tClass, Path path) throws IOException {
+        return gson.fromJson(Files.readString(path), tClass);
     }
 }

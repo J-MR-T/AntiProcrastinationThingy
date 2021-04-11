@@ -33,12 +33,12 @@ jar {
     }
 }
 
-task shipJar(dependsOn: ['copyCSS', 'copyRsc', 'copyREADME', 'jar']) {
+task shipJar(dependsOn: ['copyCSS', 'copyRes', 'copyREADME', 'jar']) {
 }
 
-task copyRsc(type: Copy) {
-    from("$projectDir/rsc")
-    into("$projectDir/build/libs/rsc")
+task copyRes(type: Copy) {
+    from("$projectDir/res")
+    into("$projectDir/build/libs/res")
 }
 
 task copyCSS(type: Copy) {

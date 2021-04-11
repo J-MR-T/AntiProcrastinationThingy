@@ -1,10 +1,8 @@
+package gui
+
 import androidx.compose.desktop.Window
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyItemScope
-import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.runtime.*
@@ -19,6 +17,7 @@ import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import gui.colors.MyColors
 import io.PersistenceHelper
 import processes.Process
 import processes.ProcessHandler
@@ -34,6 +33,14 @@ import javax.sound.sampled.FloatControl
 import kotlin.concurrent.fixedRateTimer
 
 class KotlinGUI {
+    //timers
+    private val daemonTimers: MutableList<Timer> = mutableListOf()
+
+    //options
+    private val automaticallyKillDisallowed: MutableState<Boolean> = mutableStateOf(false)
+    private val hideInsteadOfBlacklist: MutableState<Boolean> = mutableStateOf(false)
+
+    //resources
     private val icon: BufferedImage = try {
         ImageIO.read(File(Path.of("res", "shield-alt-solid.png").toUri()))
     } catch (e: IIOException) {
@@ -42,7 +49,6 @@ class KotlinGUI {
     private val mainAnnoySound: Clip
     private val fontFolder: Path = Path.of("res", "font")
     private val robotoFolder: Path = fontFolder.resolve("Roboto")
-    private val daemonTimers: MutableList<Timer> = mutableListOf()
     private val fonts: FontFamily =
         FontFamily(
             Font(robotoFolder.resolve("Roboto-Light.ttf").toFile(), FontWeight.Light),
@@ -61,7 +67,7 @@ class KotlinGUI {
 
     @Composable
     private fun defaultTheme(content: @Composable() () -> Unit) = MaterialTheme(
-        colors = darkColors(),
+        colors = MyColors.DEFAULT.getColors(),
         typography = Typography(fonts),
         content = content,
     )
@@ -71,10 +77,10 @@ class KotlinGUI {
             it.cancel()
             it.purge()
         }
-        PersistenceHelper.writeBlacklistSet(ProcessHandler.blacklisted)
-        PersistenceHelper.writeHiddenProcesses(ProcessHandler.hiddenProcesses)
+        PersistenceHelper.stopApp()
     }
 
+    //TODO fix audio
     init {
         val audioInputStream =
             AudioSystem.getAudioInputStream(File(Path.of("res", "mixkit-lone-wolf-howling-1729.wav")
@@ -91,89 +97,84 @@ class KotlinGUI {
     fun getWindow() {
         return Window(
             title = "APT",
-            size = IntSize(800, 600),
+            size = IntSize(1280, 720),
             icon = icon,
             onDismissRequest = windowCloseRequest,
         ) {
-            val automaticallyKillDisallowed = mutableStateOf(false)
             val processList: SnapshotStateList<Process> = mutableStateListOf()
             processList.addAll(ProcessHandler.computeFilteredProcessList(true))
             daemonTimers.add(initializeProcessUpdateTimer(processList))
-            daemonTimers.add(initializeAnnoyTimer(automaticallyKillDisallowed.value))
-
-            //TODO fix audio
+            daemonTimers.add(initializeAnnoyTimer(automaticallyKillDisallowed))
 
             defaultTheme {
                 Box(modifier = Modifier.background(MaterialTheme.colors.background).fillMaxSize()) {
-                    Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f)) {
-                        LazyColumn(
-                            Modifier.fillMaxWidth(0.5f),
+                    Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.9f)) {
+                        Column(
+                            Modifier.fillMaxWidth(0.5f).padding(PaddingValues(20.dp)),
                             verticalArrangement = Arrangement.spacedBy(3.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            contentPadding = PaddingValues(10.dp),
                         ) {
-                            item {
-                                Text(
-                                    text = "All Processes",
-                                    color = MaterialTheme.colors.secondary,
-                                    style = MaterialTheme.typography.h4,
-                                    fontWeight = FontWeight.Thin,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.background(MaterialTheme.colors.surface),
-                                )
-
-                            }
+                            defaultHeading("All Processes")
+                            labeledCheckbox("Hide Processes instead of Blacklisting them", hideInsteadOfBlacklist)
                             processList.forEach { proc ->
-                                item {
-                                    textBox(proc) {
+                                textBox(proc) {
+                                    if (hideInsteadOfBlacklist.value) {
+                                        ProcessHandler.hiddenProcesses.add(proc.command())
+                                    } else {
                                         ProcessHandler.blacklisted.add(proc.command())
                                     }
                                 }
                             }
                         }
-                        LazyColumn(
-                            Modifier.fillMaxWidth(),
+                        Column(
+                            Modifier.fillMaxWidth().padding(PaddingValues(20.dp)),
                             verticalArrangement = Arrangement.spacedBy(3.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            contentPadding = PaddingValues(10.dp),
                         ) {
-                            item {
-                                Text(
-                                    text = "Blacklisted Processes",
-                                    color = MaterialTheme.colors.secondary,
-                                    style = MaterialTheme.typography.h4,
-                                    fontWeight = FontWeight.Thin,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.background(MaterialTheme.colors.surface),
-                                )
-                            }
-                            item {
-                                Row(horizontalArrangement = Arrangement.SpaceEvenly) {
-                                    Checkbox(automaticallyKillDisallowed.value,
-                                        onCheckedChange = { automaticallyKillDisallowed.value = it }
-                                    )
-                                    Text(
-                                        "Automatically kill disallowed processes if running",
-                                        color = MaterialTheme.colors.secondary,
-                                        fontWeight = FontWeight.Light,
-                                    )
-                                }
-                            }
+                            defaultHeading("Blacklisted Processes")
+                            labeledCheckbox("Automatically kill disallowed processes if running",
+                                automaticallyKillDisallowed)
                             ProcessHandler.blacklistedProcesses().forEach { proc ->
-                                item {
-                                    textBox(proc) {
-                                        ProcessHandler.blacklisted.remove(proc.command())
-                                    }
+                                textBox(proc) {
+                                    ProcessHandler.blacklisted.remove(proc.command())
                                 }
                             }
                         }
 
                     }
-
+                    Button(onClick = ProcessHandler::resetHiddenProcesses,Modifier.align(Alignment.BottomEnd)) {
+                        Text("Reset hidden processes list", style = MaterialTheme.typography.body2)
+                    }
                 }
             }
         }
     }
+
+    @Composable
+    private fun labeledCheckbox(label: String, toBeAffected: MutableState<Boolean>) {
+        Row(horizontalArrangement = Arrangement.SpaceEvenly) {
+            Checkbox(toBeAffected.value,
+                onCheckedChange = { toBeAffected.value = it }
+            )
+            Text(
+                label,
+                color = MaterialTheme.colors.secondary,
+                fontWeight = FontWeight.Light,
+            )
+        }
+    }
+
+    @Composable
+    private fun defaultHeading(text: String) =
+        Text(
+            text = text,
+            color = MaterialTheme.colors.secondary,
+            style = MaterialTheme.typography.h4,
+            fontWeight = FontWeight.Thin,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.background(MaterialTheme.colors.surface),
+        )
+
 
     private fun initializeProcessUpdateTimer(list: SnapshotStateList<Process>): Timer {
         return fixedRateTimer("Update", true, 1000L, 1000L) {
@@ -185,10 +186,10 @@ class KotlinGUI {
         }
     }
 
-    private fun initializeAnnoyTimer(automaticallyKillDisallowed: Boolean): Timer {
+    private fun initializeAnnoyTimer(automaticallyKillDisallowed: MutableState<Boolean>): Timer {
         return fixedRateTimer("Annoy User", true, 0L, 1000L) {
             ProcessHandler.getDisallowedProcessesThatAreRunning().forEach {
-                if (automaticallyKillDisallowed) it.kill()
+                if (automaticallyKillDisallowed.value) it.kill()
             }
         }
     }
@@ -200,6 +201,7 @@ class KotlinGUI {
         fontWeight: FontWeight = FontWeight.Light,
         fontStyle: FontStyle = FontStyle.Normal,
         alignment: Alignment = Alignment.Center,
+        maxLines:Int=1,
         onClick: (() -> Unit)? = null,
     ) {
         return Box(
@@ -218,6 +220,7 @@ class KotlinGUI {
                 fontStyle = fontStyle,
                 fontWeight = fontWeight,
                 color = MaterialTheme.colors.onPrimary,
+                maxLines = maxLines,
             )
 
         }

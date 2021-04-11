@@ -22,14 +22,24 @@ public class ProcessHandler {
         if (!force && reducedProcessList != null && lastAllProcesses.equals(newerLastAllProcesses)) {
             return reducedProcessList;
         }
-        lastAllProcesses = newerLastAllProcesses;
-        reducedProcessList = lastAllProcesses.stream()
-                .map(Process::new)
-                .distinct()
-                .filter(proc -> proc.user().toLowerCase().contains(user.toLowerCase()))
-                .filter(proc -> cmdBlacklist.stream().map(String::toLowerCase)
-                        .noneMatch(item -> proc.command().toLowerCase().contains(item)))
-                .collect(Collectors.toList());
+        try {
+            lastAllProcesses = newerLastAllProcesses;
+            reducedProcessList = lastAllProcesses.stream()
+                    .map(Process::new)
+                    .distinct()
+                    .filter(proc -> proc.user().toLowerCase().contains(user.toLowerCase()))
+                    .filter(proc -> cmdBlacklist.stream().map(String::toLowerCase)
+                            .noneMatch(item -> proc.command().toLowerCase().contains(item)))
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            //FIXME: Sometimes:tm:, a concurrent modification Exception occurs here, if the cmdBlacklist is being
+            // modified while its stream is being read. This is probably fixable by either locking it with a
+            // synchronized block, using a blocking collection, or making a local shallow copy, the elements of which
+            // won't be concurrently modified by the user.
+            // The workaround, which is much easier, is just returning an empty list for a second, which will
+            // be replaced <1 second afterwards
+            return Collections.emptyList();
+        }
         return reducedProcessList;
     }
 
