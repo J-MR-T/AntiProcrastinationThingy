@@ -2,13 +2,12 @@ import androidx.compose.desktop.Window
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -19,7 +18,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import io.PersistenceHelper
 import processes.Process
@@ -35,7 +33,6 @@ import javax.sound.sampled.Clip
 import javax.sound.sampled.FloatControl
 import kotlin.concurrent.fixedRateTimer
 
-@ExperimentalFoundationApi
 class KotlinGUI {
     private val icon: BufferedImage = try {
         ImageIO.read(File(Path.of("res", "shield-alt-solid.png").toUri()))
@@ -94,11 +91,11 @@ class KotlinGUI {
     fun getWindow() {
         return Window(
             title = "APT",
-            size = IntSize(1280,720),
+            size = IntSize(800, 600),
             icon = icon,
             onDismissRequest = windowCloseRequest,
         ) {
-            val automaticallyKillDisallowed = remember { mutableStateOf(false) }
+            val automaticallyKillDisallowed = mutableStateOf(false)
             val processList: SnapshotStateList<Process> = mutableStateListOf()
             processList.addAll(ProcessHandler.computeFilteredProcessList(true))
             daemonTimers.add(initializeProcessUpdateTimer(processList))
@@ -108,19 +105,29 @@ class KotlinGUI {
 
             defaultTheme {
                 Box(modifier = Modifier.background(MaterialTheme.colors.background).fillMaxSize()) {
-                    Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(1f)) {
+                    Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f)) {
                         LazyColumn(
                             Modifier.fillMaxWidth(0.5f),
                             verticalArrangement = Arrangement.spacedBy(3.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             contentPadding = PaddingValues(10.dp),
                         ) {
-                            stickyHeader {
-                                defaultHeader("All Processes")
+                            item {
+                                Text(
+                                    text = "All Processes",
+                                    color = MaterialTheme.colors.secondary,
+                                    style = MaterialTheme.typography.h4,
+                                    fontWeight = FontWeight.Thin,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.background(MaterialTheme.colors.surface),
+                                )
+
                             }
-                            items(processList) { proc ->
-                                textBox(proc) {
-                                    ProcessHandler.blacklisted.add(proc.command())
+                            processList.forEach { proc ->
+                                item {
+                                    textBox(proc) {
+                                        ProcessHandler.blacklisted.add(proc.command())
+                                    }
                                 }
                             }
                         }
@@ -130,8 +137,15 @@ class KotlinGUI {
                             horizontalAlignment = Alignment.CenterHorizontally,
                             contentPadding = PaddingValues(10.dp),
                         ) {
-                            stickyHeader {
-                                defaultHeader("Blacklisted Processes")
+                            item {
+                                Text(
+                                    text = "Blacklisted Processes",
+                                    color = MaterialTheme.colors.secondary,
+                                    style = MaterialTheme.typography.h4,
+                                    fontWeight = FontWeight.Thin,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.background(MaterialTheme.colors.surface),
+                                )
                             }
                             item {
                                 Row(horizontalArrangement = Arrangement.SpaceEvenly) {
@@ -153,23 +167,12 @@ class KotlinGUI {
                                 }
                             }
                         }
+
                     }
 
                 }
             }
         }
-    }
-
-    @Composable
-    private fun defaultHeader(text: String ) {
-        Text(
-            text = text,
-            color = MaterialTheme.colors.secondary,
-            style = MaterialTheme.typography.h4,
-            fontWeight = FontWeight.Thin,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.background(MaterialTheme.colors.surface),
-        )
     }
 
     private fun initializeProcessUpdateTimer(list: SnapshotStateList<Process>): Timer {
