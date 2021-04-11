@@ -33,6 +33,11 @@ public class ProcessHandler {
         return reducedProcessList;
     }
 
+    public static List<Process> computeFilteredProcessList(boolean force) {
+        return ProcessHandler.computeReducedProcessList(force).stream()
+                .filter(proc -> !ProcessHandler.blacklisted.contains(proc.command())).collect(Collectors.toList());
+    }
+
     public static List<Process> computeReducedProcessList(String user) {
         return computeReducedProcessList(user, hiddenProcesses, false);
     }

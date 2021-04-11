@@ -15,10 +15,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-public class GsonHelper {
-    private static final Path DEFAULT_BLACKLIST_SET_PATH = Path.of("rsc", "blacklisted.json");
-    private static final Path DEFAULT_VOLUME_PATH = Path.of("rsc", "volume.txt");
-    private static final Path DEFAULT_HIDDEN_PROCESSES_PATH = Path.of("rsc", "hidden.json");
+public class PersistenceHelper {
+    private static final Path DEFAULT_BLACKLIST_SET_PATH = Path.of("res", "blacklisted.json");
+    private static final Path DEFAULT_VOLUME_PATH = Path.of("res", "volume.txt");
+    private static final Path DEFAULT_HIDDEN_PROCESSES_PATH = Path.of("res", "hidden.json");
     private static final Gson gson = new Gson();
 
     public static Set<String> readBlacklistSet(Path path) throws FileNotFoundException {

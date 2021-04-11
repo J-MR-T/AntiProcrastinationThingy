@@ -9,3 +9,5 @@ thing
   is licenced from [FontAwesome](https://fontawesome.com/) under
   the [Creative Commons Attribution 4.0 International license](https://fontawesome.com/license). There were no changes
   made to the Icon.
+  
+- For Roboto Font Family see res/font/Roboto/LICENCE.txt

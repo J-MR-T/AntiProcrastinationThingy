@@ -2,7 +2,7 @@ package gui;
 
 import com.dustinredmond.fxtrayicon.FXTrayIcon;
 import com.jfoenix.controls.*;
-import io.GsonHelper;
+import io.PersistenceHelper;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -48,19 +48,19 @@ public class GUI {
         MediaView mediaView = new MediaView();
         Slider volumeSlider = new JFXSlider(0, 100, 10);
         try {
-            GsonHelper.startApp(volumeSlider);
+            PersistenceHelper.startApp(volumeSlider);
         } catch (IOException e) {
             e.printStackTrace();
         }
         setMedia(mediaView, volumeSlider);
         //Retrieving the observable nodes object
         ObservableList<Node> nodes = root.getChildren();
-        final Image icon = new Image(Path.of("rsc", "shield-alt-solid.png").toUri().toString());
+        final Image icon = new Image(Path.of("res", "shield-alt-solid.png").toUri().toString());
 
         final FXTrayIcon trayIcon;
         URL url = null;
         try {
-            url = Path.of("rsc", "shield-alt-solid.png").toUri().toURL();
+            url = Path.of("res", "shield-alt-solid.png").toUri().toURL();
         } catch (MalformedURLException e) {
             e.printStackTrace();
 
@@ -70,9 +70,7 @@ public class GUI {
         } else {
             trayIcon = null;
         }
-        TRAY_EXIT_LISTENER = event -> {
-            exitAppUnconditional(volumeSlider, mediaView, timers, trayIcon);
-        };
+        TRAY_EXIT_LISTENER = event -> exitAppUnconditional(volumeSlider, mediaView, timers, trayIcon);
 
         JFXColorPicker primaryColorPicker = new JFXColorPicker(Color.valueOf("#393e46"));
         JFXColorPicker secondaryColorPicker = new JFXColorPicker(Color.valueOf("#00adb5"));
@@ -253,11 +251,9 @@ public class GUI {
 
 
         //This is called even if the tray Icon exists so we have to check for that separately
-        stage.setOnCloseRequest(event -> {
-            exitAppConditional(volumeSlider, mediaView,
-                    List.of(refreshProcessListAndFindDisallowedAndKillDisallowedIfAskedTo),
-                    trayIcon);
-        });
+        stage.setOnCloseRequest(event -> exitAppConditional(volumeSlider, mediaView,
+                List.of(refreshProcessListAndFindDisallowedAndKillDisallowedIfAskedTo),
+                trayIcon));
     }
 
     /**
@@ -321,7 +317,7 @@ public class GUI {
             }
             mediaView.getMediaPlayer().dispose();
             try {
-                GsonHelper.stopApp(volumeSlider.getValue() / 100);
+                PersistenceHelper.stopApp(volumeSlider.getValue() / 100);
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -348,7 +344,7 @@ public class GUI {
     /**
      * Update the parameter processesSelectionList's content using the getProcessItems method
      *
-     * @param processesSelectionList
+     * @param processesSelectionList The listView which should be updated
      * @param force                  Force the update. Use this to update the list after the hiddenList has been updated
      * @see gui.GUI
      */
@@ -389,7 +385,7 @@ public class GUI {
      * @param volumeSlider guess what
      */
     private void setMedia(String fileName, MediaView mediaView, Slider volumeSlider) {
-        Path musicFile = Path.of("rsc", fileName);
+        Path musicFile = Path.of("res", fileName);
         Media sound = new Media(musicFile.toUri().toString());
         MediaPlayer mediaPlayer = new MediaPlayer(sound);
         mediaPlayer.setVolume(volumeSlider.getValue() / 100);
