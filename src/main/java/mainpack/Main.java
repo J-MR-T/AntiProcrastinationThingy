@@ -16,6 +16,7 @@ public class Main {
                         || str.contains("-old"))) {
             LauncherImpl.launchApplication(App.class, args);
         } else {
+            //TODO implement read volume
             PersistenceHelper.startApp();
             new KotlinGUI().getWindow();
         }
