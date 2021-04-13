@@ -1,0 +1,8 @@
+package io
+
+/**
+ * EVERY SUBCLASS ***MUST*** IMPLEMENT EITHER A NO_ARGS CONSTRUCTOR OR PROVIDE DEFAULT ARGUMENTS
+ */
+interface CmdOptions{
+
+}

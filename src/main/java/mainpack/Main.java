@@ -11,13 +11,7 @@ import java.util.Arrays;
 public class Main {
 
     public static void main(String[] args) throws IOException {
-        ArgParser.CmdOptions options = new ArgParser(args).getCmdOptions();
-        if (options.getJavafxGUI()) {
-            LauncherImpl.launchApplication(App.class, args);
-        } else {
-            PersistenceHelper.startApp();
-            new KotlinGUI(options.getColors()).getWindow();
-        }
+        KotlinAppKt.main(args);
     }
 
 }
