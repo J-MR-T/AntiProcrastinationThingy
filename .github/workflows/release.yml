@@ -27,7 +27,7 @@ jobs:
       - name: buid project
         run: ./gradlew shipJar
       - name: zip release
-        run: zip ./build/AntiProcrastinationThingy.zip ./build/libs/*
+        run: zip ./build/AntiProcrastinationThingy.zip ./build/libs/**/*
       - name: upload zip
         uses: actions/upload-release-asset@v1
         env:
