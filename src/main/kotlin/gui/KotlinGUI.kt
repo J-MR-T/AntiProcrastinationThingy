@@ -5,7 +5,10 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,14 +39,16 @@ import javax.sound.sampled.FloatControl
 import kotlin.concurrent.fixedRateTimer
 import kotlin.concurrent.timer
 
-class KotlinGUI {
+class KotlinGUI(colors: MyColors = MyColors.DEFAULT) {
+    private val colors: Colors = colors.getColors()
+
     //timers
     private val daemonTimers: MutableList<Timer> = mutableListOf()
 
     //options
     private val automaticallyKillDisallowed: MutableState<Boolean> = mutableStateOf(false)
     private val hideInsteadOfBlacklist: MutableState<Boolean> = mutableStateOf(false)
-    val volume: MutableState<Float> = mutableStateOf(0.1f);
+    private val volume: MutableState<Float> = mutableStateOf(0.1f)
 
     //resources
     private val icon: BufferedImage = try {
@@ -72,8 +77,8 @@ class KotlinGUI {
         )
 
     @Composable
-    private fun defaultTheme(content: @Composable() () -> Unit) = MaterialTheme(
-        colors = MyColors.AWESOME_MAGNET.getColors(),
+    private fun defaultTheme(content: @Composable () -> Unit) = MaterialTheme(
+        colors = colors,
         typography = Typography(fonts),
         content = content,
     )
@@ -189,7 +194,7 @@ class KotlinGUI {
                                         Column {
                                             Spacer(modifier = Modifier.padding(5.dp))
                                             Text(
-                                                text = "Volume: " + (volume.value*100).toInt(),
+                                                text = "Volume: " + (volume.value * 100).toInt(),
                                                 style = MaterialTheme.typography.body1,
                                                 fontStyle = FontStyle.Normal,
                                                 fontWeight = FontWeight.Light,
@@ -266,10 +271,15 @@ class KotlinGUI {
     private fun initializeAnnoyTimer(automaticallyKillDisallowed: MutableState<Boolean>): Timer {
         return fixedRateTimer("Annoy User", true, 0L, 1000L) {
             ProcessHandler.getDisallowedProcessesThatAreRunning().forEach {
-                mainAnnoySound.start()
-                //FIXME fix the stopping of audio
-                timer("Stop audioclip", true, mainAnnoySound.microsecondLength, 0L) {
-                    mainAnnoySound.stop()
+                if (!mainAnnoySound.isRunning) {
+                    mainAnnoySound.start()
+                    //FIXME fix the stopping of audio (and inspect remove warning)
+                    daemonTimers.add(
+                        timer("Stop audioclip", true, mainAnnoySound.microsecondLength, Long.MAX_VALUE) {
+                            mainAnnoySound.stop()
+                            daemonTimers.remove(this)
+                            this.cancel()
+                        })
                 }
                 if (automaticallyKillDisallowed.value) it.kill()
             }

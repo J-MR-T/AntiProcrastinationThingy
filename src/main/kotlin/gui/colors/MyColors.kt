@@ -1,11 +1,8 @@
 package gui.colors
 
 import androidx.compose.material.Colors
-import androidx.compose.material.MaterialTheme.colors
 import androidx.compose.material.darkColors
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import kotlin.math.pow
 
 enum class MyColors(private val colors: Colors) {
     AWESOME_MAGNET(Colors(
@@ -27,7 +24,7 @@ enum class MyColors(private val colors: Colors) {
     ;
 
     fun getColors(): Colors {
-        return colors;
+        return colors
     }
 
 }

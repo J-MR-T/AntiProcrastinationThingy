@@ -1,9 +1,5 @@
-import androidx.compose.foundation.ExperimentalFoundationApi
-import gui.KotlinGUI
-import io.PersistenceHelper
+package mainpack
 
-@ExperimentalFoundationApi
-fun main() {
-    PersistenceHelper.startApp()
-    KotlinGUI().getWindow()
+fun main(args: Array<String>) {
+    Main.main(args)
 }
