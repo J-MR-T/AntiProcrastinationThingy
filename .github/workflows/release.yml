@@ -30,13 +30,13 @@ jobs:
           draft: true
           prerelease: false
       - name: zip release
-        run: zip "./build/AntiProcrastinationThingy-${{ github.ref }}.jar" ./build/libs/*
+        run: zip "./build/AntiProcrastinationThingy.jar" ./build/libs/*
       - name: upload zip
         uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.release.outputs.upload_url }}
-          asset_path: "./build/AntiProcrastinationThingy-${{ github.ref }}.jar"
-          asset_name: AntiProcrastinationThingy-${{ github.ref }}.jar
+          asset_path: "./build/AntiProcrastinationThingy.zip"
+          asset_name: AntiProcrastinationThingy.zip
           asset_content_type: application/zip
