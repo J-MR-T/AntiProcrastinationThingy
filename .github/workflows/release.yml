@@ -1,8 +1,5 @@
-name: create release and upload artifacts
-on:
-  push:
-    tags:
-      - "*"
+name: Create Release and Package Artifacts
+on: workflow_dispatch
 
 jobs:
   build:
