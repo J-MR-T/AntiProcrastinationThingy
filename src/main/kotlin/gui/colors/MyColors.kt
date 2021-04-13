@@ -1,9 +1,7 @@
 package gui.colors
 
 import androidx.compose.material.Colors
-import androidx.compose.material.MaterialTheme.colors
 import androidx.compose.material.darkColors
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 enum class MyColors(private val colors: Colors) {
@@ -12,8 +10,8 @@ enum class MyColors(private val colors: Colors) {
         primaryVariant = c(0xff8881),
         secondary = c(0x6363f7),
         secondaryVariant = c(0x9c91ff),
-        background = c(0x1c313a),
-        surface = c(0x819ca9),
+        background = c(0x263238),
+        surface = c(0x263238),
         error = c(0xff5131),
         onPrimary = c(0x000000),
         onSecondary = c(0xffffff),
@@ -26,11 +24,11 @@ enum class MyColors(private val colors: Colors) {
     ;
 
     fun getColors(): Colors {
-        return colors;
+        return colors
     }
 
 }
 
 private fun c(hex: Int): Color {
-    return Color(hex)
+    return Color(hex+0xff000000)
 }

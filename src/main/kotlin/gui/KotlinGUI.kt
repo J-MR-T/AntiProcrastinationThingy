@@ -5,7 +5,10 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -17,6 +20,9 @@ import androidx.compose.ui.text.platform.Font
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import gui.colors.ButtonColorsPrimary
 import gui.colors.MyColors
 import io.PersistenceHelper
 import processes.Process
@@ -31,14 +37,18 @@ import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.Clip
 import javax.sound.sampled.FloatControl
 import kotlin.concurrent.fixedRateTimer
+import kotlin.concurrent.timer
 
-class KotlinGUI {
+class KotlinGUI(colors: MyColors = MyColors.DEFAULT) {
+    private val colors: Colors = colors.getColors()
+
     //timers
     private val daemonTimers: MutableList<Timer> = mutableListOf()
 
     //options
     private val automaticallyKillDisallowed: MutableState<Boolean> = mutableStateOf(false)
     private val hideInsteadOfBlacklist: MutableState<Boolean> = mutableStateOf(false)
+    private val volume: MutableState<Float> = mutableStateOf(0.1f)
 
     //resources
     private val icon: BufferedImage = try {
@@ -46,6 +56,7 @@ class KotlinGUI {
     } catch (e: IIOException) {
         BufferedImage(10, 10, BufferedImage.TYPE_4BYTE_ABGR)
     }
+    private val pathToAnnoySound = Path.of("res", "mixkit-lone-wolf-howling-1729.wav")
     private val mainAnnoySound: Clip
     private val fontFolder: Path = Path.of("res", "font")
     private val robotoFolder: Path = fontFolder.resolve("Roboto")
@@ -66,8 +77,8 @@ class KotlinGUI {
         )
 
     @Composable
-    private fun defaultTheme(content: @Composable() () -> Unit) = MaterialTheme(
-        colors = MyColors.DEFAULT.getColors(),
+    private fun defaultTheme(content: @Composable () -> Unit) = MaterialTheme(
+        colors = colors,
         typography = Typography(fonts),
         content = content,
     )
@@ -83,15 +94,18 @@ class KotlinGUI {
     //TODO fix audio
     init {
         val audioInputStream =
-            AudioSystem.getAudioInputStream(File(Path.of("res", "mixkit-lone-wolf-howling-1729.wav")
+            AudioSystem.getAudioInputStream(File(pathToAnnoySound
                 .toString()).absoluteFile)
         mainAnnoySound = AudioSystem.getClip()
         mainAnnoySound.open(audioInputStream)
-        var volume = 0.6f
+        setVolumeOfClip(mainAnnoySound, volume.value)
+    }
+
+    private fun setVolumeOfClip(clip: Clip, volume: Float) {
+        val actualVolume = if (volume in -0.05f..0.05f) 0f else (0.5f + volume * 0.4f)
         val volumeControl: FloatControl = mainAnnoySound.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
         val range = volumeControl.maximum - volumeControl.minimum
-        volumeControl.value = (range * volume) + volumeControl.minimum
-//        mainAnnoySound.start()
+        volumeControl.value = (range * actualVolume) + volumeControl.minimum
     }
 
     fun getWindow() {
@@ -108,54 +122,122 @@ class KotlinGUI {
 
             defaultTheme {
                 Box(modifier = Modifier.background(MaterialTheme.colors.background).fillMaxSize()) {
-                    Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.9f)) {
-                        Column(
-                            Modifier.fillMaxWidth(0.5f).padding(PaddingValues(20.dp)),
-                            verticalArrangement = Arrangement.spacedBy(3.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            defaultHeading("All Processes")
-                            labeledCheckbox("Hide Processes instead of Blacklisting them", hideInsteadOfBlacklist)
-                            processList.forEach { proc ->
-                                textBox(proc) {
-                                    if (hideInsteadOfBlacklist.value) {
-                                        ProcessHandler.hiddenProcesses.add(proc.command())
-                                    } else {
-                                        ProcessHandler.blacklisted.add(proc.command())
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f)) {
+                            val stateLeftList = rememberScrollState(0)
+                            Column(
+                                Modifier.fillMaxWidth(0.5f).padding(PaddingValues(20.dp)),
+                                verticalArrangement = Arrangement.spacedBy(3.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                defaultHeading("All Processes")
+                                val checkboxFunction: @Composable ((Boolean) -> Unit)? = {
+                                    Dialog(onDismissRequest = {},
+                                        properties = DialogProperties(title = "Do you really want to deactivate this?")) {
+                                        Button(onClick = {
+                                            hideInsteadOfBlacklist.value = hideInsteadOfBlacklist.value.not()
+                                        }) { }
+                                    }
+                                }
+                                labeledCheckbox("Hide Processes instead of Blacklisting them",
+                                    hideInsteadOfBlacklist)
+                                //TODO make dialog to confirm you really want to disable the app
+//                            val showDialog: MutableState<Boolean> = mutableStateOf(true);
+//                            if (showDialog.value) {
+//                                Dialog(onDismissRequest = {showDialog.value=false},
+//                                    properties = DialogProperties(
+//                                        title = "Do you really want to stop this?",
+//                                        resizable = false,
+//                                    )) {
+//
+//                                }
+//                            }
+                                processList.forEach { proc ->
+                                    textBox(proc) {
+                                        if (hideInsteadOfBlacklist.value) {
+                                            ProcessHandler.hiddenProcesses.add(proc.command())
+                                        } else {
+                                            ProcessHandler.blacklisted.add(proc.command())
+                                        }
+                                    }
+                                }
+                            }
+                            //FIXME fix scrollbar(s) (make an extra column for the textBoxes with a row which
+                            // fills almost everything except the space for the scrollbar)
+                            VerticalScrollbar(
+                                modifier = Modifier.fillMaxHeight(),
+                                adapter = rememberScrollbarAdapter(stateLeftList))
+                            Column(
+                                Modifier.fillMaxWidth().padding(PaddingValues(20.dp)),
+                                verticalArrangement = Arrangement.spacedBy(3.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                            ) {
+                                defaultHeading("Blacklisted Processes")
+                                labeledCheckbox("Automatically kill disallowed processes if running",
+                                    automaticallyKillDisallowed)
+                                ProcessHandler.blacklistedProcesses().forEach { proc ->
+                                    textBox(proc) {
+                                        ProcessHandler.blacklisted.remove(proc.command())
+                                    }
+                                }
+                            }
+
+                        }
+                        Row {
+                            Spacer(Modifier.fillMaxWidth(0.5f))
+
+                            Column(modifier = Modifier.fillMaxSize()) {
+                                defaultHeading("Settings")
+                                Row {
+                                    Column(modifier = Modifier.fillMaxWidth(0.5f).fillMaxHeight()) {
+                                        defaultHeading("Volume", MaterialTheme.typography.h5)
+                                        Column {
+                                            Spacer(modifier = Modifier.padding(5.dp))
+                                            Text(
+                                                text = "Volume: " + (volume.value * 100).toInt(),
+                                                style = MaterialTheme.typography.body1,
+                                                fontStyle = FontStyle.Normal,
+                                                fontWeight = FontWeight.Light,
+                                                color = MaterialTheme.colors.primary,
+                                            )
+
+                                            Box(modifier = Modifier.fillMaxSize()) {
+                                                Slider(volume.value, modifier = Modifier.align(Alignment.BottomCenter),
+                                                    onValueChange = {
+                                                        volume.value = it
+                                                        setVolumeOfClip(mainAnnoySound, volume = volume.value)
+                                                    })
+                                            }
+                                        }
+                                    }
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        //Reset button
+                                        TextButton(
+                                            onClick = ProcessHandler::resetHiddenProcesses,
+                                            elevation = ButtonDefaults.elevation(),
+                                            modifier = Modifier.align(Alignment.BottomEnd),
+                                            colors = ButtonColorsPrimary(),
+                                        ) {
+                                            Text("Reset hidden processes list", style = MaterialTheme.typography.body2)
+                                        }
                                     }
                                 }
                             }
                         }
-                        Column(
-                            Modifier.fillMaxWidth().padding(PaddingValues(20.dp)),
-                            verticalArrangement = Arrangement.spacedBy(3.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                        ) {
-                            defaultHeading("Blacklisted Processes")
-                            labeledCheckbox("Automatically kill disallowed processes if running",
-                                automaticallyKillDisallowed)
-                            ProcessHandler.blacklistedProcesses().forEach { proc ->
-                                textBox(proc) {
-                                    ProcessHandler.blacklisted.remove(proc.command())
-                                }
-                            }
-                        }
-
-                    }
-                    Button(onClick = ProcessHandler::resetHiddenProcesses,Modifier.align(Alignment.BottomEnd)) {
-                        Text("Reset hidden processes list", style = MaterialTheme.typography.body2)
                     }
                 }
             }
         }
     }
 
+
     @Composable
-    private fun labeledCheckbox(label: String, toBeAffected: MutableState<Boolean>) {
+    private fun labeledCheckbox(
+        label: String,
+        toBeAffected: MutableState<Boolean>,
+    ) {
         Row(horizontalArrangement = Arrangement.SpaceEvenly) {
-            Checkbox(toBeAffected.value,
-                onCheckedChange = { toBeAffected.value = it }
-            )
+            Checkbox(checked = toBeAffected.value, { toBeAffected.value = it })
             Text(
                 label,
                 color = MaterialTheme.colors.secondary,
@@ -165,11 +247,11 @@ class KotlinGUI {
     }
 
     @Composable
-    private fun defaultHeading(text: String) =
+    private fun defaultHeading(text: String, style: androidx.compose.ui.text.TextStyle = MaterialTheme.typography.h4) =
         Text(
             text = text,
             color = MaterialTheme.colors.secondary,
-            style = MaterialTheme.typography.h4,
+            style = style,
             fontWeight = FontWeight.Thin,
             textAlign = TextAlign.Center,
             modifier = Modifier.background(MaterialTheme.colors.surface),
@@ -189,6 +271,16 @@ class KotlinGUI {
     private fun initializeAnnoyTimer(automaticallyKillDisallowed: MutableState<Boolean>): Timer {
         return fixedRateTimer("Annoy User", true, 0L, 1000L) {
             ProcessHandler.getDisallowedProcessesThatAreRunning().forEach {
+                if (!mainAnnoySound.isRunning) {
+                    mainAnnoySound.start()
+                    //FIXME fix the stopping of audio (and inspect remove warning)
+                    daemonTimers.add(
+                        timer("Stop audioclip", true, mainAnnoySound.microsecondLength, Long.MAX_VALUE) {
+                            mainAnnoySound.stop()
+                            daemonTimers.remove(this)
+                            this.cancel()
+                        })
+                }
                 if (automaticallyKillDisallowed.value) it.kill()
             }
         }
@@ -201,7 +293,7 @@ class KotlinGUI {
         fontWeight: FontWeight = FontWeight.Light,
         fontStyle: FontStyle = FontStyle.Normal,
         alignment: Alignment = Alignment.Center,
-        maxLines:Int=1,
+        maxLines: Int = 1,
         onClick: (() -> Unit)? = null,
     ) {
         return Box(
