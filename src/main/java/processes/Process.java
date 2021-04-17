@@ -2,14 +2,9 @@ package processes;
 
 import org.jetbrains.annotations.NotNull;
 
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Locale;
+import java.nio.file.FileSystems;
 import java.util.Objects;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 import java.util.regex.Pattern;
-import java.util.stream.Stream;
 
 public class Process {
     private final ProcessHandle handle;
@@ -48,7 +43,13 @@ public class Process {
     }
 
     private String determineStringRepresentation() {
-        String[] pathParts = command().split(Pattern.quote("\\"));
+        String sep = FileSystems.getDefault().getSeparator();
+        if(        command().contains("\\")){
+            sep="\\";
+        }else if(command().contains("/")){
+            sep="/";
+        }
+        String[] pathParts = command().split(Pattern.quote(sep));
         if (pathParts.length == 0) return "";
         String returnString = pathParts[pathParts.length - 1].toLowerCase().replaceAll(".exe|64|32", "");
         if (returnString.isBlank()) return "";

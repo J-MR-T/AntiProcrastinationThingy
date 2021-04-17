@@ -7,7 +7,8 @@ public class ProcessHandler {
     public static final List<String> DEFAULT_HIDDEN_PROCESSES =
             List.of("System32", "Nvidia", "SystemApps", "wallpaper",
                     "Razer", "Native Instruments", "xboxGam", "Microsoft.ZuneVideo", "Settings", "GWSL",
-                    "Keyboard Chattering Fix", "YourPhone", "webhelper", "Driver", "Gaomon", "Git", "fsnotifier");
+                    "Keyboard Chattering Fix", "YourPhone", "webhelper", "Driver", "Gaomon", "Git", "fsnotifier",
+                    "manager","launcher","daemon","system","proxy","kde");
     public static List<String> hiddenProcesses = new ArrayList<>(DEFAULT_HIDDEN_PROCESSES);
     public static List<Process> reducedProcessList = null;
 
