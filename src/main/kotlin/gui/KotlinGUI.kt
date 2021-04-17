@@ -5,10 +5,7 @@ import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -25,8 +22,8 @@ import androidx.compose.ui.window.DialogProperties
 import gui.colors.ButtonColorsPrimary
 import gui.colors.MyColors
 import io.PersistenceHelper
-import processes.Process
-import processes.ProcessHandler
+import processes.*
+import java.awt.Image
 import java.awt.image.BufferedImage
 import java.io.File
 import java.nio.file.Path
@@ -39,7 +36,8 @@ import javax.sound.sampled.FloatControl
 import kotlin.concurrent.fixedRateTimer
 import kotlin.concurrent.timer
 
-class KotlinGUI(colors: MyColors = MyColors.DEFAULT) {
+
+class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
     private val colors: Colors = colors.getColors()
 
     //timers
@@ -49,15 +47,24 @@ class KotlinGUI(colors: MyColors = MyColors.DEFAULT) {
     private val automaticallyKillDisallowed: MutableState<Boolean> = mutableStateOf(false)
     private val hideInsteadOfBlacklist: MutableState<Boolean> = mutableStateOf(false)
     private val volume: MutableState<Float> = mutableStateOf(0.1f)
+    private val showConfirmDialog: MutableState<Boolean> = mutableStateOf(false);
+
+    //process list
+    private val processList: SnapshotStateList<Process>;
 
     //resources
     private val icon: BufferedImage = try {
-        ImageIO.read(File(Path.of("res", "shield-alt-solid.png").toUri()))
+        resize(ImageIO.read(File(Path.of("res", "shield-alt-solid.png").toUri())), 32, 32)
     } catch (e: IIOException) {
         BufferedImage(10, 10, BufferedImage.TYPE_4BYTE_ABGR)
     }
     private val pathToAnnoySound = Path.of("res", "mixkit-lone-wolf-howling-1729.wav")
     private val mainAnnoySound: Clip
+
+    companion object {
+        private const val MAIN_ANNOY_SOUND_LENGTH: Long = 5000L
+    }
+
     private val fontFolder: Path = Path.of("res", "font")
     private val robotoFolder: Path = fontFolder.resolve("Roboto")
     private val fonts: FontFamily =
@@ -94,11 +101,23 @@ class KotlinGUI(colors: MyColors = MyColors.DEFAULT) {
     //TODO fix audio
     init {
         val audioInputStream =
-            AudioSystem.getAudioInputStream(File(pathToAnnoySound
-                .toString()).absoluteFile)
+            AudioSystem.getAudioInputStream(
+                File(
+                    pathToAnnoySound
+                        .toString()
+                ).absoluteFile
+            )
         mainAnnoySound = AudioSystem.getClip()
         mainAnnoySound.open(audioInputStream)
         setVolumeOfClip(mainAnnoySound, volume.value)
+        mainAnnoySound.setLoopPoints(0, MAIN_ANNOY_SOUND_LENGTH.toInt())
+//        mainAnnoySound.loop(Integer.MAX_VALUE)
+        mainAnnoySound.stop()
+
+        processList = mutableStateListOf()
+        processList.addAll(ProcessHandler.computeFilteredProcessList(true))
+        daemonTimers.add(initializeProcessUpdateTimer(processList))
+        daemonTimers.add(initializeAnnoyTimer(automaticallyKillDisallowed))
     }
 
     private fun setVolumeOfClip(clip: Clip, volume: Float) {
@@ -115,66 +134,45 @@ class KotlinGUI(colors: MyColors = MyColors.DEFAULT) {
             icon = icon,
             onDismissRequest = windowCloseRequest,
         ) {
-            val processList: SnapshotStateList<Process> = mutableStateListOf()
-            processList.addAll(ProcessHandler.computeFilteredProcessList(true))
-            daemonTimers.add(initializeProcessUpdateTimer(processList))
-            daemonTimers.add(initializeAnnoyTimer(automaticallyKillDisallowed))
-
             defaultTheme {
                 Box(modifier = Modifier.background(MaterialTheme.colors.background).fillMaxSize()) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f)) {
-                            val stateLeftList = rememberScrollState(0)
                             Column(
                                 Modifier.fillMaxWidth(0.5f).padding(PaddingValues(20.dp)),
                                 verticalArrangement = Arrangement.spacedBy(3.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 defaultHeading("All Processes")
-                                val checkboxFunction: @Composable ((Boolean) -> Unit)? = {
-                                    Dialog(onDismissRequest = {},
-                                        properties = DialogProperties(title = "Do you really want to deactivate this?")) {
-                                        Button(onClick = {
-                                            hideInsteadOfBlacklist.value = hideInsteadOfBlacklist.value.not()
-                                        }) { }
-                                    }
-                                }
-                                labeledCheckbox("Hide Processes instead of Blacklisting them",
-                                    hideInsteadOfBlacklist)
-                                //TODO make dialog to confirm you really want to disable the app
-//                            val showDialog: MutableState<Boolean> = mutableStateOf(true);
-//                            if (showDialog.value) {
-//                                Dialog(onDismissRequest = {showDialog.value=false},
-//                                    properties = DialogProperties(
-//                                        title = "Do you really want to stop this?",
-//                                        resizable = false,
-//                                    )) {
-//
-//                                }
-//                            }
-                                processList.forEach { proc ->
-                                    textBox(proc) {
-                                        if (hideInsteadOfBlacklist.value) {
-                                            ProcessHandler.hiddenProcesses.add(proc.command())
-                                        } else {
-                                            ProcessHandler.blacklisted.add(proc.command())
-                                        }
-                                    }
-                                }
+                                simpleLabeledCheckbox(
+                                    "Hide Processes instead of Blacklisting them",
+                                    hideInsteadOfBlacklist,
+                                )
+                                drawProcessList()
                             }
-                            //FIXME fix scrollbar(s) (make an extra column for the textBoxes with a row which
-                            // fills almost everything except the space for the scrollbar)
-                            VerticalScrollbar(
-                                modifier = Modifier.fillMaxHeight(),
-                                adapter = rememberScrollbarAdapter(stateLeftList))
                             Column(
-                                Modifier.fillMaxWidth().padding(PaddingValues(20.dp)),
+                                Modifier.fillMaxWidth()
+                                    .padding(PaddingValues(20.dp)),
                                 verticalArrangement = Arrangement.spacedBy(3.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally,
                             ) {
                                 defaultHeading("Blacklisted Processes")
-                                labeledCheckbox("Automatically kill disallowed processes if running",
-                                    automaticallyKillDisallowed)
+                                customLabeledCheckbox("Automatically kill disallowed processes if running") {
+                                    Checkbox(
+                                        checked = automaticallyKillDisallowed.value,
+                                        onCheckedChange = {
+                                            if (automaticallyKillDisallowed.value) {
+                                                showConfirmDialog.value = true
+                                            } else {
+                                                automaticallyKillDisallowed.value = it
+                                            }
+                                        },
+                                    )
+                                }
+                                if (showConfirmDialog.value) {
+                                    confirmDialog()
+                                }
+
                                 ProcessHandler.blacklistedProcesses().forEach { proc ->
                                     textBox(proc) {
                                         ProcessHandler.blacklisted.remove(proc.command())
@@ -183,56 +181,133 @@ class KotlinGUI(colors: MyColors = MyColors.DEFAULT) {
                             }
 
                         }
-                        Row {
-                            Spacer(Modifier.fillMaxWidth(0.5f))
-
-                            Column(modifier = Modifier.fillMaxSize()) {
-                                defaultHeading("Settings")
-                                Row {
-                                    Column(modifier = Modifier.fillMaxWidth(0.5f).fillMaxHeight()) {
-                                        defaultHeading("Volume", MaterialTheme.typography.h5)
-                                        Column {
-                                            Spacer(modifier = Modifier.padding(5.dp))
-                                            Text(
-                                                text = "Volume: " + (volume.value * 100).toInt(),
-                                                style = MaterialTheme.typography.body1,
-                                                fontStyle = FontStyle.Normal,
-                                                fontWeight = FontWeight.Light,
-                                                color = MaterialTheme.colors.primary,
-                                            )
-
-                                            Box(modifier = Modifier.fillMaxSize()) {
-                                                Slider(volume.value, modifier = Modifier.align(Alignment.BottomCenter),
-                                                    onValueChange = {
-                                                        volume.value = it
-                                                        setVolumeOfClip(mainAnnoySound, volume = volume.value)
-                                                    })
-                                            }
-                                        }
-                                    }
-                                    Box(modifier = Modifier.fillMaxSize()) {
-                                        //Reset button
-                                        TextButton(
-                                            onClick = ProcessHandler::resetHiddenProcesses,
-                                            elevation = ButtonDefaults.elevation(),
-                                            modifier = Modifier.align(Alignment.BottomEnd),
-                                            colors = ButtonColorsPrimary(),
-                                        ) {
-                                            Text("Reset hidden processes list", style = MaterialTheme.typography.body2)
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        settings()
                     }
                 }
             }
         }
     }
 
+    @Composable
+    private fun settings() {
+        Row {
+            Spacer(Modifier.fillMaxWidth(0.5f))
+            Column(modifier = Modifier.fillMaxSize()) {
+                defaultHeading("Settings")
+                Row {
+                    Column(modifier = Modifier.fillMaxWidth(0.5f).fillMaxHeight()) {
+                        defaultHeading("Volume", MaterialTheme.typography.h5)
+                        Column {
+                            Spacer(modifier = Modifier.padding(5.dp))
+                            Text(
+                                text = "Volume: " + (volume.value * 100).toInt(),
+                                style = MaterialTheme.typography.body1,
+                                fontStyle = FontStyle.Normal,
+                                fontWeight = FontWeight.Light,
+                                color = MaterialTheme.colors.primary,
+                            )
+
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                Slider(volume.value, modifier = Modifier.align(Alignment.BottomCenter),
+                                    onValueChange = {
+                                        volume.value = it
+                                        setVolumeOfClip(mainAnnoySound, volume = volume.value)
+                                    })
+                            }
+                        }
+                    }
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        //Reset button
+                        labeledElevatedButton(
+                            modifier = Modifier.align(Alignment.BottomEnd),
+                            onClick = ProcessHandler::resetHiddenProcesses,
+                            text = "Reset hidden processes list"
+                        )
+                    }
+                }
+            }
+        }
+    }
 
     @Composable
-    private fun labeledCheckbox(
+    private fun confirmDialog() {
+        Dialog(
+            onDismissRequest = { showConfirmDialog.value = false },
+            properties = DialogProperties(
+                title = "Do you really want to deactivate this?",
+                size = IntSize(400, 120),
+                icon = icon,
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colors.background)
+                    .padding(PaddingValues(15.dp)),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                labeledElevatedButton(Modifier.fillMaxWidth(0.5f).fillMaxHeight(), "Really stop working") {
+                    automaticallyKillDisallowed.value = false
+                    showConfirmDialog.value = false
+                }
+                labeledElevatedButton(text = "Actually, my brain tricked me again") {
+                    automaticallyKillDisallowed.value = true
+                    showConfirmDialog.value = false
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun labeledElevatedButton(modifier: Modifier = Modifier.fillMaxSize(), text: String, onClick: () -> Unit) {
+        TextButton(
+            modifier = modifier,
+            onClick = onClick,
+            elevation = ButtonDefaults.elevation(),
+            colors = ButtonColorsPrimary(),
+        ) {
+            Text(
+                text,
+                style = MaterialTheme.typography.body2
+            )
+        }
+    }
+
+    @Composable
+    private fun drawProcessList() {
+        val stateLeftList = rememberScrollState(0)
+        Row {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth(0.92f)
+                    .verticalScroll(stateLeftList),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+
+                ) {
+                processList.forEach { proc ->
+                    textBox(proc) {
+                        if (hideInsteadOfBlacklist.value) {
+                            ProcessHandler.hiddenProcesses.add(proc.command())
+                        } else {
+                            ProcessHandler.blacklisted.add(proc.command())
+                        }
+                    }
+                }
+            }
+            //FIXME fix scrollbar(s) (make an extra column for the textBoxes with a row which
+            // fills almost everything except the space for the scrollbar)
+            Spacer(Modifier.fillMaxWidth(0.1f))
+            VerticalScrollbar(
+                modifier = Modifier.fillMaxHeight(),
+                adapter = rememberScrollbarAdapter(stateLeftList)
+            )
+        }
+    }
+
+
+    @Composable
+    private fun simpleLabeledCheckbox(
         label: String,
         toBeAffected: MutableState<Boolean>,
     ) {
@@ -244,6 +319,30 @@ class KotlinGUI(colors: MyColors = MyColors.DEFAULT) {
                 fontWeight = FontWeight.Light,
             )
         }
+    }
+
+    @Composable
+    private fun customLabeledCheckbox(
+        label: String,
+        checkbox: @Composable () -> Unit,
+    ) {
+        Row(horizontalArrangement = Arrangement.SpaceEvenly) {
+            checkbox()
+            Text(
+                label,
+                color = MaterialTheme.colors.secondary,
+                fontWeight = FontWeight.Light,
+            )
+        }
+    }
+
+    fun resize(img: BufferedImage, newW: Int, newH: Int): BufferedImage {
+        val tmp: Image = img.getScaledInstance(newW, newH, Image.SCALE_SMOOTH)
+        val dimg = BufferedImage(newW, newH, BufferedImage.TYPE_INT_ARGB)
+        val g2d = dimg.createGraphics()
+        g2d.drawImage(tmp, 0, 0, null)
+        g2d.dispose()
+        return dimg
     }
 
     @Composable
@@ -275,8 +374,10 @@ class KotlinGUI(colors: MyColors = MyColors.DEFAULT) {
                     mainAnnoySound.start()
                     //FIXME fix the stopping of audio (and inspect remove warning)
                     daemonTimers.add(
-                        timer("Stop audioclip", true, mainAnnoySound.microsecondLength, Long.MAX_VALUE) {
+                        timer("Stop audioclip", true, MAIN_ANNOY_SOUND_LENGTH, Long.MAX_VALUE) {
                             mainAnnoySound.stop()
+
+                            println("test")
                             daemonTimers.remove(this)
                             this.cancel()
                         })
