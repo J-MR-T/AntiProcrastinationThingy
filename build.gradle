@@ -3,11 +3,11 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '1.4.30'
+    id 'org.jetbrains.kotlin.jvm' version '1.4.31'
     id 'application'
     id 'org.openjfx.javafxplugin' version '0.0.9'
     id 'java'
-    id 'org.jetbrains.compose' version '0.3.0'
+    id 'org.jetbrains.compose' version '0.3.2'
 }
 
 repositories {
@@ -31,6 +31,10 @@ jar {
     from {
         configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }
     }
+}
+
+compileKotlin {
+    kotlinOptions.useIR = true
 }
 
 task shipJar(dependsOn: ['copyCSS', 'copyRes', 'copyREADME', 'jar']) {
