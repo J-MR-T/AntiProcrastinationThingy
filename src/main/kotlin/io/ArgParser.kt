@@ -4,7 +4,6 @@ import gui.colors.MyColors
 
 typealias OptionManipulationFunction = (String?, ArgParser.CmdOptions) -> Unit
 typealias Option = Pair<String, OptionManipulationFunction>
-typealias Theme = Pair<String, MyColors>
 
 class ArgParser(override val args: Array<String>) : CommandlineArgumentParser<ArgParser.CmdOptions> {
 
@@ -22,12 +21,12 @@ class ArgParser(override val args: Array<String>) : CommandlineArgumentParser<Ar
     private val newGUIKeywords = listOf("new", "compose")
     private val oldGUIKeywords = listOf("old", "javafx")
     private val themes: Map<String, MyColors> = mapOf(
-        Theme("dark", MyColors.DARK),
-        Theme("awesome", MyColors.AWESOME_MAGNET),
-        Theme("default", MyColors.AWESOME_MAGNET),
-        Theme("magnet", MyColors.AWESOME_MAGNET),
-        Theme("shitty", MyColors.LIGHT),
-        Theme("light", MyColors.LIGHT),
+        "dark" to MyColors.DARK,
+        "awesome" to MyColors.AWESOME_MAGNET,
+        "default" to MyColors.AWESOME_MAGNET,
+        "magnet" to MyColors.AWESOME_MAGNET,
+        "shitty" to MyColors.LIGHT,
+        "light" to MyColors.LIGHT,
     )
 
     /**
