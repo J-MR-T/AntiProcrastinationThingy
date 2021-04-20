@@ -4,6 +4,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.nio.file.FileSystems;
 import java.util.Objects;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Process {
@@ -44,16 +45,26 @@ public class Process {
 
     private String determineStringRepresentation() {
         String sep = FileSystems.getDefault().getSeparator();
-        if(        command().contains("\\")){
-            sep="\\";
-        }else if(command().contains("/")){
-            sep="/";
+        if (command().contains("\\")) {
+            sep = "\\";
+        } else if (command().contains("/")) {
+            sep = "/";
         }
         String[] pathParts = command().split(Pattern.quote(sep));
         if (pathParts.length == 0) return "";
-        String returnString = pathParts[pathParts.length - 1].toLowerCase().replaceAll(".exe|64|32", "");
+        String returnString = pathParts[pathParts.length - 1];
+        if(!returnString.toUpperCase().equals(returnString)){
+            returnString=returnString.replaceAll("[A-Z]", " $0").replaceAll("\\. ",".");
+        }
+        returnString = returnString
+                .toLowerCase()
+                .replaceAll("\\.exe|\\.app|64|32", "");
+        Matcher m = Pattern.compile(" [a-z]").matcher(returnString);
+        returnString = m.replaceAll(matchResult -> matchResult.group().toUpperCase())
+                .replaceAll("_", " ");
         if (returnString.isBlank()) return "";
-        return Character.toUpperCase(returnString.charAt(0)) + returnString.substring(1);
+        m = Pattern.compile(".").matcher(returnString);
+        return m.replaceFirst(matchResult -> matchResult.group().toUpperCase());
     }
 
     @Override
