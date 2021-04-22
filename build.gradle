@@ -32,17 +32,12 @@ compileKotlin {
     }
 }
 
-task shipJar(dependsOn: ['copyCSS', 'copyRes', 'copyREADME', 'jar']) {
+task shipJar(dependsOn: ['copyRes', 'copyREADME', 'jar']) {
 }
 
 task copyRes(type: Copy) {
     from("$projectDir/res")
     into("$projectDir/build/libs/res")
-}
-
-task copyCSS(type: Copy) {
-    from("$projectDir/darkmode-style.css");
-    into("$projectDir/build/libs")
 }
 
 task copyREADME(type: Copy) {
