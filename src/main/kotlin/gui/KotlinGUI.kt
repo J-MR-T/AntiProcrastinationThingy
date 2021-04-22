@@ -1,9 +1,6 @@
 package gui
 
-import androidx.compose.desktop.AppFrame
-import androidx.compose.desktop.AppManager
-import androidx.compose.desktop.Window
-import androidx.compose.desktop.WindowEvents
+import androidx.compose.desktop.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +32,7 @@ import javax.imageio.ImageIO
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.Clip
 import javax.sound.sampled.FloatControl
+import javax.swing.SwingUtilities.invokeLater
 import kotlin.concurrent.fixedRateTimer
 import kotlin.concurrent.timer
 
@@ -47,7 +45,7 @@ class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
     private val notifier = Notifier()
 
     //timers
-    private val daemonTimers: MutableList<Timer> = mutableListOf()
+    private val daemonTimers: MutableList<Pair<TimerTask, Timer>> = Collections.synchronizedList(mutableListOf())
 
     //options
     private val automaticallyKillDisallowed: MutableState<Boolean> = mutableStateOf(false)
@@ -110,9 +108,9 @@ class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
     }
 
     private val close: () -> Unit = {
-        daemonTimers.forEach {
-            it.cancel()
-            it.purge()
+        daemonTimers.forEach { (task, timer) ->
+            timer.cancel()
+            timer.purge()
         }
         PersistenceHelper.stopApp()
     }
@@ -151,12 +149,12 @@ class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
 
     private fun setVolumeOfClip(clip: Clip, volume: Float) {
         val actualVolume = if (volume in -0.05f..0.05f) 0f else (0.5f + volume * 0.4f)
-        val volumeControl: FloatControl = mainAnnoySound.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
+        val volumeControl: FloatControl = clip.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
         val range = volumeControl.maximum - volumeControl.minimum
         volumeControl.value = (range * actualVolume) + volumeControl.minimum
     }
 
-    fun getWindow() {
+    private fun getWindow() {
         return Window(
             title = "APT",
             size = IntSize(1280, 720),
@@ -204,7 +202,8 @@ class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
 
                                 ProcessHandler.blacklistedProcesses().forEach { proc ->
                                     textBox(proc) {
-                                        ProcessHandler.blacklisted.remove(proc.command())
+                                        ProcessHandler.blacklisted?.remove(proc.command())
+                                        daemonTimers.refresh();
                                     }
                                 }
                             }
@@ -215,7 +214,6 @@ class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
                             Spacer(Modifier.fillMaxWidth(0.5f))
                             settings()
                         }
-
                     }
                 }
             }
@@ -346,8 +344,9 @@ class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
                         if (hideInsteadOfBlacklist.value) {
                             ProcessHandler.hiddenProcesses.add(proc.command())
                         } else {
-                            ProcessHandler.blacklisted.add(proc.command())
+                            ProcessHandler.blacklisted?.add(proc.command())
                         }
+                        daemonTimers.refresh();
                     }
                 }
             }
@@ -413,38 +412,52 @@ class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
         val dimg = BufferedImage(newW, newH, BufferedImage.TYPE_INT_ARGB)
         val g2d = dimg.createGraphics()
         g2d.drawImage(tmp, 0, 0, null)
+        object : TimerTask() {
+            override fun run() {
+            }
+        }
         g2d.dispose()
         return dimg
     }
 
-    private fun initializeProcessUpdateTimer(list: SnapshotStateList<Process>): Timer {
-        return fixedRateTimer("Update", true, 1000L, 1000L) {
-            val newList = ProcessHandler.computeFilteredProcessList(false)
-            if (list != newList) {
-                list.removeIf { !newList.contains(it) }
-                newList.forEach { if (!list.contains(it)) list.add(it) }
+    private fun initializeProcessUpdateTimer(list: SnapshotStateList<Process>): Pair<TimerTask, Timer> {
+        val task = object : TimerTask() {
+            override fun run() {
+                val newList = ProcessHandler.computeFilteredProcessList(false)
+                if (list != newList) {
+                    synchronized(list) {
+                        list.removeIf { !newList.contains(it) }
+                        newList.forEach { if (!list.contains(it)) list.add(it) }
+                    }
+                }
             }
-        }
+        };
+        return task to fixedRateTimer("Update", true, 1000L, 1000L) { task.run() }
     }
 
-    private fun initializeAnnoyTimer(automaticallyKillDisallowed: MutableState<Boolean>): Timer {
-        return fixedRateTimer("Annoy User", true, 0L, 1000L) {
-            annoyUser(automaticallyKillDisallowed)
-        }
+    private fun initializeAnnoyTimer(automaticallyKillDisallowed: MutableState<Boolean>): Pair<TimerTask, Timer> {
+        val task = object : TimerTask() {
+            override fun run() {
+                annoyUser(automaticallyKillDisallowed)
+            }
+        };
+        return task to fixedRateTimer("Annoy User", true, 0L, 1000L) { task.run() };
     }
 
     private fun annoyUser(automaticallyKillDisallowed: MutableState<Boolean>) {
-        ProcessHandler.getDisallowedProcessesThatAreRunning().forEach {
+        ProcessHandler.disallowedProcessesThatAreRunning.forEach {
             if (!mainAnnoySound.isRunning) {
                 mainAnnoySound.start()
                 //FIXME fix the stopping of audio (and inspect remove warning)
-                daemonTimers.add(
-                    timer("Stop audioclip", true, MAIN_ANNOY_SOUND_LENGTH, Long.MAX_VALUE) {
-                        mainAnnoySound.stop()
-                        println("test")
-                        daemonTimers.remove(this)
-                        this.cancel()
-                    })
+                val task = object : TimerTask() {
+                    override fun run() {
+                        synchronized(mainAnnoySound) {
+                            mainAnnoySound.stop()
+                            this.cancel()
+                        }
+                    }
+                }
+                task to timer("Stop audioclip", true, MAIN_ANNOY_SOUND_LENGTH, Long.MAX_VALUE) { task.run() }
             }
             notifier.warn("!!!Disallowed Process!!!", "$it is disallowed!")
             if (automaticallyKillDisallowed.value) it.kill()
@@ -484,4 +497,11 @@ class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
         }
     }
 
+    private fun MutableList<Pair<TimerTask, Timer>>.refresh() {
+        synchronized(this) {
+            forEach { (task, timer) ->
+                task.run()
+            }
+        }
+    }
 }
