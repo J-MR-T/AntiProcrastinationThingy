@@ -3,6 +3,7 @@ plugins {
     id 'application'
     id 'java'
     id 'org.jetbrains.compose' version '0.3.2'
+    id 'org.jetbrains.kotlin.plugin.serialization' version '1.4.31'
 }
 
 repositories {
@@ -47,8 +48,8 @@ task copyREADME(type: Copy) {
 
 dependencies {
     implementation 'org.jetbrains:annotations-java5:20.1.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-serialization-json:1.1.0'
     implementation(compose.desktop.currentOs)
-    implementation 'com.google.code.gson:gson:2.8.6'
     implementation "org.jetbrains.kotlin:kotlin-reflect:1.4.32"
     implementation "org.jetbrains.kotlin:kotlin-reflect:1.4.30"
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
