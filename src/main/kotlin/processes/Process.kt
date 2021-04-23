@@ -1,10 +1,13 @@
 package processes
 
+import kotlinx.serialization.Serializable
 import java.nio.file.FileSystems
 import java.util.*
 import java.util.regex.MatchResult
 import java.util.regex.Pattern
 
+//TODO make the serialization work
+@Serializable
 class Process {
     private val handle: ProcessHandle
     private var stringRepresentation: String

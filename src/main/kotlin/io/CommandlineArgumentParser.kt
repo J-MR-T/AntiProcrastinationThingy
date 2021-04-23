@@ -6,10 +6,19 @@ import kotlin.reflect.KFunction
 
 interface CommandlineArgumentParser<T : CmdOptions> {
     val args: Array<String>
-    val possibleArguments: Map<String, (value: String?, options: T) -> Unit>
+    val possibleArguments: Map<Regex, (value: String?, options: T) -> Unit>
 
-    private fun getSingleOption(name: String): String? {
-        return args.find { it.startsWith("-$name=") }?.split("=")?.get(1)?.toLowerCase()
+    private fun getSingleOption(name: Regex): String? {
+        return args.find { it.matches(name.let { regex -> Regex("[-]+(${regex.pattern})[=\\s]([^\\s=])+") }) }
+            ?.split("=", " ")?.get(1)
+            ?.toLowerCase()
+    }
+
+    fun Option(
+        first: String,
+        second: (String?, ArgParser.CmdOptions) -> Unit
+    ): Pair<Regex, (String?, ArgParser.CmdOptions) -> Unit> {
+        return Regex(first) to second;
     }
 
     fun getCmdOptionsInternal(kClass: KClass<T>): T {

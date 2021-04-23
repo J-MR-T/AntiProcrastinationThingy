@@ -1,6 +1,7 @@
 package gui
 
-import androidx.compose.desktop.*
+import androidx.compose.desktop.AppManager
+import androidx.compose.desktop.Window
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,9 +20,10 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.*
 import gui.colors.ButtonColorsPrimary
-import gui.colors.MyColors
+import io.ArgParser
 import io.PersistenceHelper
-import processes.*
+import processes.Process
+import processes.ProcessHandler
 import java.awt.Image
 import java.awt.image.BufferedImage
 import java.io.File
@@ -32,14 +34,18 @@ import javax.imageio.ImageIO
 import javax.sound.sampled.AudioSystem
 import javax.sound.sampled.Clip
 import javax.sound.sampled.FloatControl
-import javax.swing.SwingUtilities.invokeLater
 import kotlin.concurrent.fixedRateTimer
 import kotlin.concurrent.timer
 
 
-class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
-    //colors
-    private val colors: Colors = colors.getColors()
+object KotlinGUI {
+    //options
+    internal var options: ArgParser.CmdOptions = ArgParser.CmdOptions()
+        set(options) {
+            this.volume.value = options.volume.toFloat()
+            setVolumeOfClip(mainAnnoySound, options.volume.toFloat())
+            field = options
+        }
 
     //notifier
     private val notifier = Notifier()
@@ -50,7 +56,7 @@ class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
     //options
     private val automaticallyKillDisallowed: MutableState<Boolean> = mutableStateOf(false)
     private val hideInsteadOfBlacklist: MutableState<Boolean> = mutableStateOf(false)
-    private val volume: MutableState<Float> = mutableStateOf(0.1f)
+    private var volume: MutableState<Float> = mutableStateOf(0.1f)
     private val showConfirmDialog: MutableState<Boolean> = mutableStateOf(false);
     private val closeToTray: MutableState<Boolean> = mutableStateOf(false);
 
@@ -66,9 +72,7 @@ class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
     private val pathToAnnoySound = Path.of("res", "mixkit-lone-wolf-howling-1729.wav")
     private val mainAnnoySound: Clip
 
-    companion object {
-        private const val MAIN_ANNOY_SOUND_LENGTH: Long = 5000L
-    }
+    private const val MAIN_ANNOY_SOUND_LENGTH: Long = 5000L
 
     private val fontFolder: Path = Path.of("res", "font")
     private val robotoFolder: Path = fontFolder.resolve("Roboto")
@@ -90,7 +94,7 @@ class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
 
     @Composable
     private fun defaultTheme(content: @Composable () -> Unit) = MaterialTheme(
-        colors = colors,
+        colors = options.colors.getColors(),
         typography = Typography(fonts),
         content = content,
     )
@@ -112,7 +116,7 @@ class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
             timer.cancel()
             timer.purge()
         }
-        PersistenceHelper.stopApp()
+        PersistenceHelper.stopApp(volume.value.toDouble())
     }
 
     //TODO fix audio
@@ -148,16 +152,20 @@ class KotlinGUI(colors: MyColors = MyColors.AWESOME_MAGNET) {
     }
 
     private fun setVolumeOfClip(clip: Clip, volume: Float) {
-        val actualVolume = if (volume in -0.05f..0.05f) 0f else (0.5f + volume * 0.4f)
-        val volumeControl: FloatControl = clip.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
-        val range = volumeControl.maximum - volumeControl.minimum
-        volumeControl.value = (range * actualVolume) + volumeControl.minimum
+        try {
+            val actualVolume = if (volume in -0.05f..0.05f) 0f else (0.5f + volume * 0.4f)
+            val volumeControl: FloatControl = clip.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
+            val range = volumeControl.maximum - volumeControl.minimum
+            volumeControl.value = (range * actualVolume) + volumeControl.minimum
+        }catch (e:IllegalArgumentException){
+
+        }
     }
 
     private fun getWindow() {
         return Window(
             title = "APT",
-            size = IntSize(1280, 720),
+            size = IntSize(options.width, options.height),
             icon = icon,
             onDismissRequest = windowCloseRequest,
         ) {
