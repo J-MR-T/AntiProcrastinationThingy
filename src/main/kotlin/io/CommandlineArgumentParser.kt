@@ -22,18 +22,11 @@ interface CommandlineArgumentParser<T : CmdOptions> {
     }
 
     fun getCmdOptionsInternal(kClass: KClass<T>): T {
-        val options: T =
-            try {
-                kClass.constructors.firstOrNull { constructor ->
-                    constructor.parameters.isEmpty() || constructor.parameters.all { kParameter -> kParameter.isOptional }
-                }
-                    ?.callBy(emptyMap())
-                    ?: throw NoZeroArgumentConstructorException(kClass.constructors)
-            } catch (e: NoZeroArgumentConstructorException) {
-                throw e
-            } catch (e: Exception) {
-                throw NoZeroArgumentConstructorException(kClass.constructors)
-            }
+        val options: T = kClass.constructors.firstOrNull { constructor ->
+            constructor.parameters.isEmpty() || constructor.parameters.all { kParameter -> kParameter.isOptional }
+        }
+            ?.callBy(emptyMap())
+            ?: throw NoZeroArgumentConstructorException(kClass.constructors)
         possibleArguments.forEach { entry ->
             val value: String? = getSingleOption(entry.key)
             entry.value(value, options)

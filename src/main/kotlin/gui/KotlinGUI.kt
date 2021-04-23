@@ -123,10 +123,7 @@ object KotlinGUI {
     init {
         val audioInputStream =
             AudioSystem.getAudioInputStream(
-                File(
-                    pathToAnnoySound
-                        .toString()
-                ).absoluteFile
+                File(pathToAnnoySound.toString()).absoluteFile
             )
         mainAnnoySound = AudioSystem.getClip()
         mainAnnoySound.open(audioInputStream)
@@ -157,7 +154,7 @@ object KotlinGUI {
             val volumeControl: FloatControl = clip.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
             val range = volumeControl.maximum - volumeControl.minimum
             volumeControl.value = (range * actualVolume) + volumeControl.minimum
-        }catch (e:IllegalArgumentException){
+        } catch (e: IllegalArgumentException) {
 
         }
     }
