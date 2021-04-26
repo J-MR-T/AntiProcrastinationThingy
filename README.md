@@ -11,7 +11,7 @@ thing
 
 # Credit:
 
-- [Icon](https://fontawesome.com/icons/shield-alt?style=solid) (rsc/shield-alt-solid.svg and rsc/shield-alt-solid.png)
+- [Icon](https://fontawesome.com/icons/shield-alt?style=solid) (res/shield-alt-solid.svg and res/shield-alt-solid.png)
   is licenced from [FontAwesome](https://fontawesome.com/) under
   the [Creative Commons Attribution 4.0 International license](https://fontawesome.com/license). There were no changes
   made to the Icon.
