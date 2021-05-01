@@ -7,14 +7,13 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.graphics.Color
 
-class ButtonColorsSecondary : ButtonColors {
+class ButtonColorsError:ButtonColors {
     @Composable
     override fun backgroundColor(enabled: Boolean): State<Color> {
-        return mutableStateOf(MaterialTheme.colors.secondary)
+        return mutableStateOf(MaterialTheme.colors.error)
     }
-
     @Composable
     override fun contentColor(enabled: Boolean): State<Color> {
-        return mutableStateOf(MaterialTheme.colors.onSecondary)
+        return mutableStateOf(MaterialTheme.colors.onError)
     }
 }

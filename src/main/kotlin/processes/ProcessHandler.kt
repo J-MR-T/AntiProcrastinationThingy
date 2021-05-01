@@ -31,9 +31,9 @@ object ProcessHandler {
             lastAllProcesses = newerLastAllProcesses
             synchronized(cmdBlacklist) {
                 reducedProcessList = lastAllProcesses.stream()
-                    .map { handle: ProcessHandle? ->
+                    .map { handle: ProcessHandle ->
                         Process(
-                            handle!!
+                            handle
                         )
                     }
                     .distinct()
@@ -63,21 +63,21 @@ object ProcessHandler {
     }
 
     fun computeFilteredProcessList(force: Boolean): List<Process> {
-        return computeReducedProcessList(force = force)!!.stream()
-            .filter { proc: Process ->
-                !blacklisted!!.contains(
+        return computeReducedProcessList(force = force)?.stream()
+            ?.filter { proc: Process ->
+                !blacklisted.contains(
                     proc.command()
                 )
-            }.collect(Collectors.toList())
+            }?.collect(Collectors.toList()) ?: emptyList()
     }
 
     val disallowedProcessesThatAreRunning: List<Process>
         get() {
-            synchronized(blacklisted!!) {
+            synchronized(blacklisted) {
                 return computeReducedProcessList(force = true)!!
                     .stream()
                     .filter { process: Process ->
-                        blacklisted!!.contains(
+                        blacklisted.contains(
                             process.command()
                         )
                     }
@@ -85,12 +85,13 @@ object ProcessHandler {
             }
         }
 
-    fun blacklistedProcesses(): Collection<Process> {
-        synchronized(blacklisted!!) {
-            return blacklisted!!.stream().map { command: String? -> Process(command!!) }
-                .collect(Collectors.toList())
+    val blacklistedProcesses: Collection<Process>
+        get() {
+            synchronized(blacklisted) {
+                return blacklisted.stream().map { command: String? -> Process(command!!) }
+                    .collect(Collectors.toList())
+            }
         }
-    }
 
     fun resetHiddenProcesses() {
         hiddenProcesses = ArrayList(DEFAULT_HIDDEN_PROCESSES)

@@ -1,3 +1,5 @@
+@file:Suppress("FunctionName")
+
 package io
 
 import kotlin.reflect.KClass
@@ -18,7 +20,7 @@ interface CommandlineArgumentParser<T : CmdOptions> {
         first: String,
         second: (String?, ArgParser.CmdOptions) -> Unit
     ): Pair<Regex, (String?, ArgParser.CmdOptions) -> Unit> {
-        return Regex(first) to second;
+        return Regex(first) to second
     }
 
     fun getCmdOptionsInternal(kClass: KClass<T>): T {
@@ -37,7 +39,7 @@ interface CommandlineArgumentParser<T : CmdOptions> {
 }
 
 inline fun <reified T : CmdOptions> CommandlineArgumentParser<T>.getCmdOptions(): T {
-    return getCmdOptionsInternal(T::class);
+    return getCmdOptionsInternal(T::class)
 }
 
 class NoZeroArgumentConstructorException(constructors: Collection<KFunction<Any>>? = null) :

@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.Color
 class ButtonColorsPrimary:ButtonColors {
     @Composable
     override fun backgroundColor(enabled: Boolean): State<Color> {
-        return mutableStateOf(MaterialTheme.colors.primaryVariant)
+        return mutableStateOf(MaterialTheme.colors.primary)
     }
     @Composable
     override fun contentColor(enabled: Boolean): State<Color> {
