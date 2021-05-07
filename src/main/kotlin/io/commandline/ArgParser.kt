@@ -7,8 +7,8 @@ typealias OptionManipulationFunction = (String?, ArgParser.CmdOptions) -> Unit
 
 class ArgParser(override val args: Array<String>) : CommandlineArgumentParser<ArgParser.CmdOptions> {
 
-    val trueRegex: Regex = Regex("1|true|yes|((enable(d))?)")
-    val falseRegex: Regex = Regex("0|false|no|((disable(d))?)")
+    val trueRegex: Regex = Regex("1|true|yes|(enable(d?))")
+    val falseRegex: Regex = Regex("0|false|no|(disable(d?))")
 
     override var possibleArguments: Map<Regex, OptionManipulationFunction> =
         mapOf(
