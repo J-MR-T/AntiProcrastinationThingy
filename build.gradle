@@ -9,16 +9,15 @@ plugins {
 repositories {
     mavenCentral()
     jcenter()
-    maven {
-        url "https://maven.pkg.jetbrains.space/public/p/compose/dev"
-    }
+    maven { url "https://maven.pkg.jetbrains.space/public/p/compose/dev" }
+    maven { url 'https://jitpack.io' }
 }
 
 //create a single Jar with all dependencies
 jar {
     duplicatesStrategy(duplicatesStrategy.INHERIT)
     manifest {
-        attributes "Main-Class": "mainpack.Main"
+        attributes "Main-Class": "mainpack.KotlinAppKt"
     }
 
     from {

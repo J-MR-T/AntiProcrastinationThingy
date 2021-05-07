@@ -1,6 +1,6 @@
 @file:Suppress("FunctionName")
 
-package io
+package io.commandline
 
 import kotlin.reflect.KClass
 import kotlin.reflect.KFunction

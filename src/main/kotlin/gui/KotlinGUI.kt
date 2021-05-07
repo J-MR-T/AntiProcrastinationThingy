@@ -1,7 +1,10 @@
-@file:Suppress("FunctionName","unused")
+@file:Suppress("FunctionName", "unused")
 
 package gui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.animateContentSize
 import androidx.compose.desktop.AppFrame
 import androidx.compose.desktop.AppManager
 import androidx.compose.desktop.Window
@@ -27,9 +30,9 @@ import androidx.compose.ui.window.*
 import gui.colors.ButtonColorsError
 import gui.colors.ButtonColorsPrimary
 import gui.colors.ButtonColorsSecondary
-import io.ArgParser
-import io.CmdOptions
-import io.PersistenceHelper
+import io.commandline.ArgParser
+import io.commandline.CmdOptions
+import io.serialization.PersistenceHelper
 import processes.Process
 import processes.ProcessHandler
 import java.awt.Image
@@ -146,7 +149,22 @@ object KotlinGUI {
 
     private val windowCloseRequest: () -> Unit = {
         if (!closeToTray.value) {
-            close
+            exit
+        }
+    }
+
+    private val exit = {
+        if (!unclosable.value) {
+            close()
+            AppManager.windows.forEach { window ->
+                window.window.defaultCloseOperation = WindowConstants.EXIT_ON_CLOSE
+            }
+            AppManager.windows.forEach(AppFrame::close)
+            tray?.remove()
+            AppManager.exit()
+            SwingUtilities.invokeLater {
+                exitProcess(0)
+            }
         }
     }
 
@@ -158,19 +176,18 @@ object KotlinGUI {
         PersistenceHelper.stopApp(volume.value.toDouble())
     }
 
-    //TODO fix audio
     init {
         resetClip()
 
         processList = mutableStateListOf()
-        processList.addAll(ProcessHandler.computeFilteredProcessList(true))
+        processList.addAll(ProcessHandler.computeFilteredProcessList())
         daemonTimers.add(initializeProcessUpdateTimer(processList))
         daemonTimers.add(initializeAnnoyTimer(automaticallyKillDisallowed))
 
         //Ensure correct loading and saving before and after the app is started/closed
         AppManager.setEvents(
             onAppStart = { PersistenceHelper.startApp() }, // Invoked before the first window is created
-            onAppExit = { close() } // Invoked after all windows are closed
+            onAppExit = exit // Invoked after all windows are closed
         )
     }
 
@@ -186,30 +203,30 @@ object KotlinGUI {
         setCloseToTray(closeToTray.value)
     }
 
-    private fun setVolumeOfClip(clip: Clip, volume: Float) {
+    private fun setVolumeOfClip(clip: Clip, volume: Float) =
         try {
             val actualVolume = if (volume in -0.05f..0.05f) 0f else (0.5f + volume * 0.4f)
             val volumeControl: FloatControl = clip.getControl(FloatControl.Type.MASTER_GAIN) as FloatControl
             val range = volumeControl.maximum - volumeControl.minimum
             volumeControl.value = (range * actualVolume) + volumeControl.minimum
-        } catch (e: IllegalArgumentException) {
+        } catch (ignored: IllegalArgumentException) {
 
         }
-    }
 
+
+    @OptIn(ExperimentalAnimationApi::class)
     private fun getWindow() {
         return Window(
             title = "APT",
             size = IntSize(options.width, options.height),
             icon = icon,
-            //TODO stop it from closing if unclosable.value
             onDismissRequest = windowCloseRequest,
         ) {
             tray()
             defaultTheme {
                 Box(modifier = Modifier.background(MaterialTheme.colors.background).fillMaxSize()) {
                     Column(modifier = Modifier.fillMaxSize()) {
-                        Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.8f)) {
+                        Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.75f)) {
                             Column(
                                 Modifier.fillMaxWidth(0.5f).padding(PaddingValues(20.dp)),
                                 verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -241,22 +258,17 @@ object KotlinGUI {
                                         },
                                     )
                                 }
-                                if (showConfirmDialog.value) {
+                                AnimatedVisibility(showConfirmDialog.value) {
                                     confirmDialog()
                                 }
                                 val scrollState: ScrollState = rememberScrollState(0)
                                 scrollableColumn(scrollState) {
-                                    ProcessHandler.blacklistedProcesses.forEach { proc ->
-                                        textBox(proc) {
-                                            ProcessHandler.blacklisted.remove(proc.command())
-                                            daemonTimers.refresh()
-                                        }
-                                    }
+                                    drawBlacklist()
                                 }
                             }
 
                         }
-                        //At 90% height
+                        //At 75% height
                         Row {
                             Spacer(Modifier.fillMaxWidth(0.5f))
                             settings()
@@ -265,6 +277,19 @@ object KotlinGUI {
                 }
             }
         }
+    }
+
+    @Composable
+    private fun drawBlacklist() {
+        ProcessHandler.blacklisted
+            .forEach { cmd ->
+                textBox(Process.prettyProcessString(cmd)) {
+                    synchronized(ProcessHandler.blacklisted) {
+                        ProcessHandler.blacklisted.remove(cmd)
+                        ProcessHandler.blacklisted = ProcessHandler.blacklisted
+                    }
+                }
+            }
     }
 
     @Composable
@@ -286,20 +311,7 @@ object KotlinGUI {
                         ),
                         MenuItem(
                             name = "Exit",
-                            onClick = {
-                                if (!unclosable.value) {
-                                    close()
-                                    AppManager.windows.forEach { window ->
-                                        window.window.defaultCloseOperation = WindowConstants.EXIT_ON_CLOSE
-                                    }
-                                    AppManager.windows.forEach(AppFrame::close)
-                                    tray?.remove()
-                                    AppManager.exit()
-                                    SwingUtilities.invokeLater {
-                                        exitProcess(0)
-                                    }
-                                }
-                            }
+                            onClick = exit
                         ),
                     )
                 }
@@ -310,6 +322,7 @@ object KotlinGUI {
         }
     }
 
+    @OptIn(ExperimentalAnimationApi::class)
     @Composable
     private fun settings() {
         Column(modifier = Modifier.fillMaxSize()) {
@@ -320,28 +333,31 @@ object KotlinGUI {
                     Column {
                         simpleLabeledCheckbox(text = "Enable Audio Feedback", toBeAffected = audio)
                         Spacer(modifier = Modifier.padding(2.dp))
-                        if (audio.value) {
-                            Text(
-                                text = "Volume: " + (volume.value * 100).toInt(),
-                                style = MaterialTheme.typography.body1,
-                                fontStyle = FontStyle.Normal,
-                                fontWeight = FontWeight.Light,
-                                color = MaterialTheme.colors.onBackground,
-                            )
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                Slider(
-                                    volume.value,
-                                    modifier = Modifier.align(Alignment.BottomCenter),
-                                    onValueChange = {
-                                        volume.value = it
-                                        setVolumeOfClip(mainAnnoySound, volume = volume.value)
-                                    },
-                                    colors = SliderDefaults.colors(
-                                        MaterialTheme.colors.secondary,
-                                        MaterialTheme.colors.error,
-                                        MaterialTheme.colors.secondary
-                                    )
+                        AnimatedVisibility(audio.value) {
+                            Column {
+                                Text(
+                                    text = "Volume: " + (volume.value * 100).toInt(),
+                                    style = MaterialTheme.typography.body1,
+                                    fontStyle = FontStyle.Normal,
+                                    fontWeight = FontWeight.Light,
+                                    color = MaterialTheme.colors.onBackground,
                                 )
+//                                Spacer(modifier = Modifier.padding(1.dp))
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    Slider(
+                                        volume.value,
+                                        modifier = Modifier.align(Alignment.BottomCenter),
+                                        onValueChange = {
+                                            volume.value = it
+                                            setVolumeOfClip(mainAnnoySound, volume = volume.value)
+                                        },
+                                        colors = SliderDefaults.colors(
+                                            MaterialTheme.colors.secondary,
+                                            MaterialTheme.colors.error,
+                                            MaterialTheme.colors.secondary
+                                        )
+                                    )
+                                }
                             }
                         }
                     }
@@ -433,31 +449,31 @@ object KotlinGUI {
 
     @Composable
     private fun drawProcessList() {
-        val stateLeftList = rememberScrollState(0)
+        val stateLeftList = rememberScrollState(1)
 
-            scrollableColumn(stateLeftList) {
-                processList.forEach { proc ->
-                    textBox(
-                        proc,
-                        backgroundColor = if (hideInsteadOfBlacklist.value) MaterialTheme.colors.secondary
-                        else MaterialTheme.colors.primary,
-                        textColor = if (hideInsteadOfBlacklist.value) MaterialTheme.colors.onSecondary
-                        else MaterialTheme.colors.onPrimary,
-                    ) {
-                        if (hideInsteadOfBlacklist.value) {
-                            ProcessHandler.hiddenProcesses.add(proc.command())
-                        } else {
-                            ProcessHandler.blacklisted.add(proc.command())
-                        }
-                        daemonTimers.refresh()
+        scrollableColumn(stateLeftList) {
+            processList.forEach { proc ->
+                textBox(
+                    proc,
+                    backgroundColor = if (hideInsteadOfBlacklist.value) MaterialTheme.colors.secondary
+                    else MaterialTheme.colors.primary,
+                    textColor = if (hideInsteadOfBlacklist.value) MaterialTheme.colors.onSecondary
+                    else MaterialTheme.colors.onPrimary,
+                ) {
+                    if (hideInsteadOfBlacklist.value) {
+                        ProcessHandler.hiddenProcesses.add(proc)
+                    } else {
+                        ProcessHandler.blacklisted.add(proc)
                     }
+//                    daemonTimers.refresh()
                 }
             }
+        }
     }
 
     @Composable
     private fun scrollableColumn(
-        stateLeftList: ScrollState,
+        scrollState: ScrollState,
         modifier: Modifier = Modifier.fillMaxSize(),
         contentRatio: Float = 0.975f,
         spaceRatio: Float = 0.333f,
@@ -469,7 +485,7 @@ object KotlinGUI {
             Column(
                 modifier = Modifier
                     .fillMaxWidth(contentRatio)
-                    .verticalScroll(stateLeftList),
+                    .verticalScroll(scrollState),
                 verticalArrangement = verticalArrangement,
                 horizontalAlignment = horizontalAlignment,
                 content = content
@@ -477,7 +493,7 @@ object KotlinGUI {
             Spacer(Modifier.fillMaxWidth(spaceRatio))
             VerticalScrollbar(
                 modifier = Modifier.fillMaxSize(),
-                adapter = rememberScrollbarAdapter(stateLeftList),
+                adapter = rememberScrollbarAdapter(scrollState),
             )
         }
     }
@@ -566,7 +582,7 @@ object KotlinGUI {
     private fun initializeProcessUpdateTimer(list: SnapshotStateList<Process>): Pair<TimerTask, Timer> {
         val task = object : TimerTask() {
             override fun run() {
-                val newList = ProcessHandler.computeFilteredProcessList(false)
+                val newList = ProcessHandler.computeFilteredProcessList()
                 if (list != newList) {
                     synchronized(list) {
                         list.removeIf { !newList.contains(it) }
@@ -607,7 +623,8 @@ object KotlinGUI {
         }
     }
 
-
+    //FIXME Animation, probably doesnt work because the recomposition is blocked by the process filtering calls which are too slow
+    @OptIn(ExperimentalAnimationApi::class)
     @Composable
     fun textBox(
         text: Any = "Item",
@@ -620,9 +637,10 @@ object KotlinGUI {
         textColor: Color = MaterialTheme.colors.onPrimary,
         onClick: (() -> Unit)? = null,
     ) {
-        return Box(
+        Box(
             modifier = Modifier
                 .fillMaxWidth(fillFraction)
+                .animateContentSize()
                 .clip(RoundedCornerShape(3.dp))
                 .background(backgroundColor)
                 .clickable(true) {
@@ -638,7 +656,6 @@ object KotlinGUI {
                 color = textColor,
                 maxLines = maxLines,
             )
-
         }
     }
 

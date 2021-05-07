@@ -1,8 +1,8 @@
 package mainpack
 
 import gui.KotlinGUI
-import io.ArgParser
-import io.getCmdOptions
+import io.commandline.ArgParser
+import io.commandline.getCmdOptions
 
 fun main(args: Array<String>) {
     val options = ArgParser(args).getCmdOptions()

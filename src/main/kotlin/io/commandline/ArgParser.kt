@@ -1,6 +1,7 @@
-package io
+package io.commandline
 
 import gui.colors.MyColors
+import io.serialization.PersistenceHelper
 
 typealias OptionManipulationFunction = (String?, ArgParser.CmdOptions) -> Unit
 
@@ -28,8 +29,8 @@ class ArgParser(override val args: Array<String>) : CommandlineArgumentParser<Ar
                 if (value?.matches(falseRegex) == true) options.unclosable = false
             },
             Option("audio") { value: String?, options: CmdOptions ->
-                options.audio = value?.matches(trueRegex) == true
-                options.audio = value?.matches(falseRegex) == true
+                if (value?.matches(trueRegex) == true) options.audio = true
+                if (value?.matches(falseRegex) == true) options.audio = false
             },
         )
 
@@ -53,6 +54,6 @@ class ArgParser(override val args: Array<String>) : CommandlineArgumentParser<Ar
         var volume: Double = PersistenceHelper.loadFromFile(PersistenceHelper.DEFAULT_VOLUME_PATH) ?: 0.1,
         var unclosable: Boolean = false,
         var audio: Boolean = true,
-    ) : io.CmdOptions
+    ) : io.commandline.CmdOptions
 
 }
