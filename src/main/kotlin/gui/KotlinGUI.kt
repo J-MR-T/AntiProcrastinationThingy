@@ -139,10 +139,8 @@ object KotlinGUI {
                     hoverDurationMillis = 250,
                     hoverColor = MaterialTheme.colors.primaryVariant,
                     shape = MaterialTheme.shapes.medium,
-                )
-            ) {
-                content()
-            }
+                ),content = content
+            )
         }
 
 
@@ -216,7 +214,7 @@ object KotlinGUI {
     private fun getWindow() {
         return Window(
             title = "APT",
-            size = IntSize(options.width, options.height),
+            size = IntSize(options.width, options.height+5),
             icon = icon,
             onDismissRequest = windowCloseRequest,
         ) {
