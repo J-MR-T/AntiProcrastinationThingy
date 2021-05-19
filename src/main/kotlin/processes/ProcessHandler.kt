@@ -1,5 +1,8 @@
 package processes
 
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
 import processes.implementations.ProcessIdentifier
 import processes.implementations.RunningProcess
 import java.util.stream.Stream
@@ -13,8 +16,8 @@ object ProcessHandler {
         "Keyboard Chattering Fix", "YourPhone", "webhelper", "Driver", "Gaomon", "Git", "fsnotifier",
         "manager", "launcher", "daemon", "system", "proxy", "kde"
     )
-    var blacklisted: MutableSet<Process> = HashSet()
-    var hiddenProcesses: MutableSet<Process> = resetHiddenProcesses()
+    var blacklisted: SnapshotStateList<Process> = mutableStateListOf()
+    var hiddenProcesses: MutableList<Process> = resetHiddenProcesses()
 
     private var allProcesses =
         ProcessHandle.allProcesses().asSequence().associate { handle ->
@@ -25,7 +28,7 @@ object ProcessHandler {
     @JvmOverloads
     fun computeReducedProcessList(
         user: String = System.getProperty("user.name"),
-        cmdBlacklist: Set<Process> = hiddenProcesses,
+        cmdBlacklist: List<Process> = hiddenProcesses,
     ): Stream<RunningProcess>? {
         ProcessHandle.allProcesses().parallel().forEach { handle ->
             allProcesses.computeIfAbsent(handle.info().command().orElse("")) {
@@ -69,10 +72,10 @@ object ProcessHandler {
             }
         }
 
-    fun resetHiddenProcesses(): MutableSet<Process> {
+    fun resetHiddenProcesses(): MutableList<Process> {
         hiddenProcesses = DEFAULT_HIDDEN_PROCESSES
             .map { name -> ProcessIdentifier(stringRepresentation = name) }
-            .toMutableSet()
-        return hiddenProcesses;
+            .toMutableStateList()
+        return hiddenProcesses.toMutableStateList()
     }
 }

@@ -31,7 +31,6 @@ import gui.colors.ButtonColorsError
 import gui.colors.ButtonColorsPrimary
 import gui.colors.ButtonColorsSecondary
 import io.commandline.ArgParser
-import io.commandline.CmdOptions
 import io.serialization.PersistenceHelper
 import processes.Process
 import processes.ProcessHandler
@@ -160,7 +159,6 @@ object KotlinGUI {
                 window.window.defaultCloseOperation = WindowConstants.EXIT_ON_CLOSE
             }
             AppManager.windows.forEach(AppFrame::close)
-            tray?.remove()
             AppManager.exit()
             SwingUtilities.invokeLater {
                 exitProcess(0)
@@ -281,15 +279,11 @@ object KotlinGUI {
 
     @Composable
     private fun drawBlacklist() {
-        ProcessHandler.blacklisted
-            .forEach { cmd ->
-                textBox(Process.prettyProcessString(cmd)) {
-                    synchronized(ProcessHandler.blacklisted) {
-                        ProcessHandler.blacklisted.remove(cmd)
-                        ProcessHandler.blacklisted = ProcessHandler.blacklisted
-                    }
-                }
+        ProcessHandler.blacklisted.forEach { cmd ->
+            textBox(cmd.stringRepresentation) {
+                ProcessHandler.blacklisted.remove(cmd)
             }
+        }
     }
 
     @Composable
@@ -508,25 +502,6 @@ object KotlinGUI {
     ) {
         Row(modifier, horizontalArrangement = Arrangement.SpaceEvenly) {
             Checkbox(checked = toBeAffected.value, onCheckedChange ?: { toBeAffected.value = it })
-            Text(
-                text,
-                color = MaterialTheme.colors.onBackground,
-                fontWeight = FontWeight.Light,
-            )
-        }
-    }
-
-    //FIXME doesnt work yet because of recomposition issues
-    @Composable
-    private inline fun <reified T : CmdOptions> simpleLabeledOptionManipulationCheckbox(
-        modifier: Modifier = Modifier,
-        text: String,
-        options: T = this.options as T,
-        checkedFunction: (T) -> Boolean,
-        noinline optionManipulationFunction: ((Boolean, T) -> Unit),
-    ) {
-        Row(modifier, horizontalArrangement = Arrangement.SpaceEvenly) {
-            Checkbox(checked = checkedFunction(options), { b -> optionManipulationFunction(b, options) })
             Text(
                 text,
                 color = MaterialTheme.colors.onBackground,

@@ -1,5 +1,7 @@
 package io.serialization
 
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.toMutableStateList
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -15,19 +17,16 @@ object PersistenceHelper {
     val DEFAULT_HIDDEN_PROCESSES_PATH: Path = Path.of("res", "hidden.json")
 
     fun startApp() {
-        val blacklisted = try {
-            loadFromFile<MutableSet<Process>>(DEFAULT_BLACKLIST_SET_PATH)
-        }catch (e:Exception){
-            emptySet<Process>().toMutableSet()
-        }
-        ProcessHandler.blacklisted = blacklisted ?: mutableSetOf()
-        val hiddenProcesses = loadFromFile<MutableSet<Process>>(DEFAULT_HIDDEN_PROCESSES_PATH)
-        ProcessHandler.hiddenProcesses = hiddenProcesses ?: ProcessHandler.resetHiddenProcesses()
+        val blacklisted =
+            loadFromFile<List<Process>>(DEFAULT_BLACKLIST_SET_PATH)
+        ProcessHandler.blacklisted = blacklisted?.toMutableStateList() ?: mutableStateListOf()
+        val hiddenProcesses = loadFromFile<MutableList<Process>>(DEFAULT_HIDDEN_PROCESSES_PATH)
+        ProcessHandler.hiddenProcesses = hiddenProcesses?.toMutableStateList() ?: ProcessHandler.resetHiddenProcesses()
         computeReducedProcessList()
     }
 
     fun stopApp(volume: Double? = null) {
-        saveToFile(ProcessHandler.blacklisted, DEFAULT_BLACKLIST_SET_PATH)
+        saveToFile(ProcessHandler.blacklisted.toList(), DEFAULT_BLACKLIST_SET_PATH)
         volume?.let { saveToFile(it, DEFAULT_VOLUME_PATH) }
         saveToFile(ProcessHandler.hiddenProcesses, DEFAULT_HIDDEN_PROCESSES_PATH)
     }
