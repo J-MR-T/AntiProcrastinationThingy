@@ -1,98 +1,81 @@
 package processes
 
-import java.util.stream.Collectors
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.toMutableStateList
+import processes.implementations.ProcessIdentifier
+import processes.implementations.RunningProcess
+import java.util.stream.Stream
+import kotlin.streams.asSequence
+import kotlin.streams.toList
 
 object ProcessHandler {
-    val DEFAULT_HIDDEN_PROCESSES = java.util.List.of(
+    val DEFAULT_HIDDEN_PROCESSES: MutableSet<String> = mutableSetOf(
         "System32", "Nvidia", "SystemApps", "wallpaper",
         "Razer", "Native Instruments", "xboxGam", "Microsoft.ZuneVideo", "Settings", "GWSL",
         "Keyboard Chattering Fix", "YourPhone", "webhelper", "Driver", "Gaomon", "Git", "fsnotifier",
         "manager", "launcher", "daemon", "system", "proxy", "kde"
     )
-    var hiddenProcesses: MutableList<String> = ArrayList(DEFAULT_HIDDEN_PROCESSES)
-    var reducedProcessList: MutableList<Process>? = null
-    var blacklisted: MutableSet<String> = HashSet()
+    var blacklisted: SnapshotStateList<Process> = mutableStateListOf()
+    var hiddenProcesses: MutableList<Process> = resetHiddenProcesses()
 
-    //TODO this might not work with lastAllProcess.equals(), because the ordering of ProcessHandle.allProcesses() is
-    // unclear
-    private var lastAllProcesses = ProcessHandle.allProcesses().collect(Collectors.toList())
+    private var allProcesses =
+        ProcessHandle.allProcesses().asSequence().associate { handle ->
+            (handle.info().command().orElse("")) to RunningProcess(handle)
+        }.toMutableMap()
+
 
     @JvmOverloads
     fun computeReducedProcessList(
-        force: Boolean = false,
         user: String = System.getProperty("user.name"),
-        cmdBlacklist: List<String> = hiddenProcesses,
-    ): List<Process>? {
-        val newerLastAllProcesses = ProcessHandle.allProcesses().collect(Collectors.toList())
-        if (!force && reducedProcessList != null && lastAllProcesses == newerLastAllProcesses) {
-            return reducedProcessList
+        cmdBlacklist: List<Process> = hiddenProcesses,
+    ): Stream<RunningProcess>? {
+        ProcessHandle.allProcesses().parallel().forEach { handle ->
+            allProcesses.computeIfAbsent(handle.info().command().orElse("")) {
+                RunningProcess(handle)
+            }
         }
-        try {
-            lastAllProcesses = newerLastAllProcesses
-            synchronized(cmdBlacklist) {
-                reducedProcessList = lastAllProcesses.stream()
-                    .map { handle: ProcessHandle? ->
-                        Process(
-                            handle!!
+        synchronized(cmdBlacklist) {
+            return allProcesses.values
+                .parallelStream()
+                .distinct()
+                .filter { proc ->
+                    proc.user.toLowerCase().contains(user.toLowerCase())
+                }
+                .filter { proc ->
+                    cmdBlacklist.none { otherProcess ->
+                        proc.equals(otherProcess) || proc.command.contains(
+                            otherProcess.stringRepresentation,
+                            ignoreCase = true
                         )
                     }
-                    .distinct()
-                    .filter { proc: Process ->
-                        proc.user().toLowerCase().contains(user.toLowerCase())
-                    }
-                    .filter { proc: Process ->
-                        cmdBlacklist.stream().map { obj: String -> obj.toLowerCase() }
-                            .noneMatch { item: String? ->
-                                proc.command().toLowerCase().contains(
-                                    item!!
-                                )
-                            }
-                    }
-                    .collect(Collectors.toList())
-            }
-        } catch (e: Exception) {
-            //FIXME: Sometimes:tm:, a concurrent modification Exception occurs here, if the cmdBlacklist is being
-            // modified while its stream is being read. This is probably fixable by either locking it with a
-            // synchronized block, using a blocking collection, or making a local shallow copy, the elements of which
-            // won't be concurrently modified by the user.
-            // The workaround, which is much easier, is just returning an empty list for a second, which will
-            // be replaced <1 second afterwards
-            return emptyList()
+                }
         }
-        return reducedProcessList
     }
 
-    fun computeFilteredProcessList(force: Boolean): List<Process> {
-        return computeReducedProcessList(force = force)!!.stream()
-            .filter { proc: Process ->
-                !blacklisted!!.contains(
-                    proc.command()
+    fun computeFilteredProcessList(): List<RunningProcess> {
+        return computeReducedProcessList()
+            ?.filter { proc: Process ->
+                !blacklisted.contains(
+                    proc.command
                 )
-            }.collect(Collectors.toList())
+            }?.toList() ?: emptyList()
     }
 
-    val disallowedProcessesThatAreRunning: List<Process>
+    val disallowedProcessesThatAreRunning: List<RunningProcess>
         get() {
-            synchronized(blacklisted!!) {
-                return computeReducedProcessList(force = true)!!
-                    .stream()
-                    .filter { process: Process ->
-                        blacklisted!!.contains(
-                            process.command()
-                        )
-                    }
-                    .collect(Collectors.toList())
+            synchronized(blacklisted) {
+                return computeReducedProcessList()
+                    ?.filter { process: Process ->
+                        blacklisted.contains(process)
+                    }?.toList() ?: emptyList()
             }
         }
 
-    fun blacklistedProcesses(): Collection<Process> {
-        synchronized(blacklisted!!) {
-            return blacklisted!!.stream().map { command: String? -> Process(command!!) }
-                .collect(Collectors.toList())
-        }
-    }
-
-    fun resetHiddenProcesses() {
-        hiddenProcesses = ArrayList(DEFAULT_HIDDEN_PROCESSES)
+    fun resetHiddenProcesses(): MutableList<Process> {
+        hiddenProcesses = DEFAULT_HIDDEN_PROCESSES
+            .map { name -> ProcessIdentifier(stringRepresentation = name) }
+            .toMutableStateList()
+        return hiddenProcesses.toMutableStateList()
     }
 }
