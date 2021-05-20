@@ -10,11 +10,11 @@ import kotlin.streams.asSequence
 import kotlin.streams.toList
 
 object ProcessHandler {
-    val DEFAULT_HIDDEN_PROCESSES: MutableSet<String> = mutableSetOf(
+    val DEFAULT_HIDDEN_PROCESSES: Set<String> = setOf(
         "System32", "Nvidia", "SystemApps", "wallpaper",
         "Razer", "Native Instruments", "xboxGam", "Microsoft.ZuneVideo", "Settings", "GWSL",
         "Keyboard Chattering Fix", "YourPhone", "webhelper", "Driver", "Gaomon", "Git", "fsnotifier",
-        "manager", "launcher", "daemon", "system", "proxy", "kde"
+        "manager", "launcher", "daemon", "system", "proxy", "kde","qt"
     )
     var blacklisted: SnapshotStateList<Process> = mutableStateListOf()
     var hiddenProcesses: MutableList<Process> = resetHiddenProcesses()
