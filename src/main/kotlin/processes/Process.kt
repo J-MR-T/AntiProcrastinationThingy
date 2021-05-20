@@ -34,6 +34,7 @@ abstract class Process(
 
     companion object {
         fun prettyProcessString(command: String): String {
+            if (command.isBlank()) return "";
             var sep = FileSystems.getDefault().separator
             if (command.contains("\\")) {
                 sep = "\\"

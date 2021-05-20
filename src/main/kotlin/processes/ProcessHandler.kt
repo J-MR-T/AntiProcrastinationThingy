@@ -19,47 +19,59 @@ object ProcessHandler {
     var blacklisted: SnapshotStateList<Process> = mutableStateListOf()
     var hiddenProcesses: MutableList<Process> = resetHiddenProcesses()
 
-    private var allProcesses =
-        ProcessHandle.allProcesses().asSequence().associate { handle ->
-            (handle.info().command().orElse("")) to RunningProcess(handle)
-        }.toMutableMap()
+    val afterKill: (RunningProcess) -> Unit = { proc: RunningProcess ->
+        allProcesses.remove(proc.command)
+    }
 
+    //:blobdoubt:
+    private var allProcesses: MutableMap<String, RunningProcess> =
+        ProcessHandle.allProcesses().asSequence().associate { handle ->
+            (handle.info().command().orElse("")) to (RunningProcess(handle, afterKill))
+        }.toMutableMap()
 
     @JvmOverloads
     fun computeReducedProcessList(
         user: String = System.getProperty("user.name"),
         cmdBlacklist: List<Process> = hiddenProcesses,
     ): Stream<RunningProcess>? {
-        ProcessHandle.allProcesses().parallel().forEach { handle ->
-            allProcesses.computeIfAbsent(handle.info().command().orElse("")) {
-                RunningProcess(handle)
+        val runningProcesses =
+            ProcessHandle.allProcesses().asSequence()
+                .associateBy { processHandle -> processHandle.info().command().orElse("") }
+
+        synchronized(allProcesses) {
+            runningProcesses.values.parallelStream().forEach { handle ->
+                val handleCommand = handle.info().command().orElse("")
+                allProcesses.computeIfAbsent(handleCommand) {
+                    RunningProcess(handle, afterKill)
+                }
             }
         }
+        val user = user.toLowerCase()
         synchronized(cmdBlacklist) {
             return allProcesses.values
                 .parallelStream()
                 .distinct()
                 .filter { proc ->
-                    proc.user.toLowerCase().contains(user.toLowerCase())
+                    proc.user.contains(user)
                 }
                 .filter { proc ->
                     cmdBlacklist.none { otherProcess ->
-                        proc.equals(otherProcess) || proc.command.contains(
+                        proc == otherProcess || proc.command.contains(
                             otherProcess.stringRepresentation,
                             ignoreCase = true
                         )
                     }
                 }
+                .filter {
+                    runningProcesses.keys.contains(it.command)
+                }
         }
     }
 
-    fun computeFilteredProcessList(): List<RunningProcess> {
-        return computeReducedProcessList()
-            ?.filter { proc: Process ->
-                !blacklisted.contains(
-                    proc.command
-                )
-            }?.toList() ?: emptyList()
+    fun computeFilteredProcessList(stream: Stream<RunningProcess>? = computeReducedProcessList()): List<RunningProcess> {
+        return stream?.filter { proc: Process ->
+            !blacklisted.contains(proc)
+        }?.toList() ?: emptyList()
     }
 
     val disallowedProcessesThatAreRunning: List<RunningProcess>

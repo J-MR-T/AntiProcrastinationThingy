@@ -139,7 +139,7 @@ object KotlinGUI {
                     hoverDurationMillis = 250,
                     hoverColor = MaterialTheme.colors.primaryVariant,
                     shape = MaterialTheme.shapes.medium,
-                ),content = content
+                ), content = content
             )
         }
 
@@ -214,12 +214,13 @@ object KotlinGUI {
     private fun getWindow() {
         return Window(
             title = "APT",
-            size = IntSize(options.width, options.height+5),
+            size = IntSize(options.width, options.height + 5),
             icon = icon,
             onDismissRequest = windowCloseRequest,
         ) {
             tray()
             defaultTheme {
+                val list = mutableListOf<Int>()
                 Box(modifier = Modifier.background(MaterialTheme.colors.background).fillMaxSize()) {
                     Column(modifier = Modifier.fillMaxSize()) {
                         Row(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.75f)) {
